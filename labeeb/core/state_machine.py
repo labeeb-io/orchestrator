@@ -95,16 +95,18 @@ def event_brain_prompt(
         Return exactly one action envelope:
         {DECISION_START}
         {{
-          "action": "PASS" | "REPAIR" | "APPROVE_JULES_PLAN" | "ANSWER_JULES" | "BLOCKED" | "FAIL",
+          "action": "PASS" | "REPAIR" | "RETURN_TO_THINKING" | "APPROVE_JULES_PLAN" | "ANSWER_JULES" | "BLOCKED" | "FAIL",
           "reason": "...",
           "repair_message": "required only for REPAIR",
           "answer_message": "required only for ANSWER_JULES",
+          "invalidate_roots": ["artifact_type_to_invalidate_if_assumption_disproved"],
           "evidence_assessment": "..."
         }}
         {DECISION_END}
 
         Rules:
         - PASS only if the original Goal Contract is actually evidenced, not because Jules says completed.
+        - RETURN_TO_THINKING if validation or proof reveals an invalidated planning assumption rather than a code defect. Specify invalidate_roots. This preserves the single repair budget.
         - REPAIR must be a targeted correction of a concrete mismatch; no redesign or scope widening.
         - If authority/scope/evidence is insufficient, BLOCKED.
         - No prose outside the envelope.

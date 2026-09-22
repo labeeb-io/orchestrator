@@ -391,6 +391,23 @@ class LabeebController:
         state["macro_phase"] = "REPORTING"
         state["baseline_shortcut"] = True
         self.record_event("baseline.shortcut_pass", evidence)
+        if state.get("reasoning_graph_active"):
+            from labeeb.models import PathIntegrityStatus
+            with contextlib.suppress(Exception):
+                self.artifact_store.write_artifact(
+                    state=state,
+                    artifact_type="goal_proof",
+                    data={
+                        "proof_entrypoint": (state.get("artifacts") or {}).get("proof_contract"),
+                        "path_integrity_status": PathIntegrityStatus.ORIGINAL,
+                        "proof_passed": True,
+                        "validation_status": "PASS",
+                        "terminal_path": "BASELINE_SHORTCUT",
+                        "execution_rounds": 0,
+                    },
+                    producer="controller",
+                    allow_stale_dependency=True,
+                )
         self.pass_goal(state, decision, evidence)
 
     def handle_review_decision(self, state: dict[str, Any], decision: dict[str, Any]) -> None:
@@ -514,7 +531,9 @@ class LabeebController:
             review_ref = self.store.write_json(self.paths.reviews / f"evidence-{sha256_text(key)[:12]}.json", evidence)
             state["review_ref"] = review_ref
             state["phase"] = "VALIDATING"
+            state["macro_phase"] = "PROVE"
             self.store.save(state)
+            self.record_event("prove.started", {"round": state.get("execution_rounds", 1)})
             return True
 
         evidence = {
@@ -549,6 +568,58 @@ class LabeebController:
                         "previous_validation": evidence.get("validation"),
                     }
         state["review_ref"] = self.store.write_json(self.paths.reviews / f"validated-{uuid.uuid4().hex[:10]}.json", evidence)
+
+        # Write V2 execution, validation, and goal_proof artifacts
+        if state.get("reasoning_graph_active"):
+            from labeeb.models import PathIntegrityStatus
+            with contextlib.suppress(Exception):
+                self.artifact_store.write_artifact(
+                    state=state,
+                    artifact_type="implementation_result",
+                    data={
+                        "session_id": state.get("jules_session_id"),
+                        "patch_hash": evidence.get("patch_hash"),
+                        "patch_files": evidence.get("files") or [],
+                        "base_commit": evidence.get("base_commit"),
+                        "execution_round": int(state.get("execution_rounds", 1)),
+                    },
+                    producer="jules",
+                    allow_stale_dependency=True,
+                )
+            val = evidence.get("validation") or {}
+            with contextlib.suppress(Exception):
+                self.artifact_store.write_artifact(
+                    state=state,
+                    artifact_type="validation_result",
+                    data={
+                        "status": val.get("status"),
+                        "exit_code": val.get("exit_code"),
+                        "duration_seconds": val.get("duration_seconds"),
+                        "commands": val.get("commands") or [],
+                        "error": val.get("error"),
+                    },
+                    producer="controller",
+                    allow_stale_dependency=True,
+                )
+            proof_contract = contract.get("proof_contract") or {}
+            with contextlib.suppress(Exception):
+                self.artifact_store.write_artifact(
+                    state=state,
+                    artifact_type="goal_proof",
+                    data={
+                        "entrypoint": proof_contract.get("entrypoint"),
+                        "path_integrity_status": state.get("path_integrity_status", PathIntegrityStatus.ORIGINAL),
+                        "proof_passed": val.get("status") == "PASS",
+                        "validation_status": val.get("status"),
+                        "validation_exit_code": val.get("exit_code"),
+                        "patch_hash": evidence.get("patch_hash"),
+                        "execution_rounds": int(state.get("execution_rounds", 1)),
+                        "repair_reserved": bool(state.get("repair_reserved", False)),
+                    },
+                    producer="controller",
+                    allow_stale_dependency=True,
+                )
+
         self.wake_brain_for_event(state, {"type": "IMPLEMENTATION_RESULT", "round": "repair" if state.get("repair_reserved") else "initial"}, evidence)
         return True
 

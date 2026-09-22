@@ -56,6 +56,8 @@ ACTIVITY_ARTIFACT_TYPES = {
     ReasoningActivity.INDEPENDENT_CRITIQUE: CRITIC_REVIEW,
 }
 
+ARTIFACT_TO_ACTIVITY = {v: k for k, v in ACTIVITY_ARTIFACT_TYPES.items()}
+
 
 def handle_reasoning_decision(ctl: LabeebController, state: dict[str, Any], decision: dict[str, Any]) -> None:
     """Process structured reasoning activity decision envelope."""
@@ -433,6 +435,13 @@ def dispatch_jules(ctl: LabeebController, state: dict[str, Any]) -> None:
     if not prompt:
         ctl.block(state, "Approved plan has no Jules execution prompt")
         return
+    max_rounds = int(ctl.config.get("planning.max_execution_rounds", 2))
+    current_rounds = int(state.get("execution_rounds", 0))
+    if current_rounds >= max_rounds:
+        ctl.fail(state, f"Execution rounds exhausted: reached maximum of {max_rounds} rounds")
+        return
+    state["execution_rounds"] = current_rounds + 1
+    state["macro_phase"] = "EXECUTE"
     op_id = new_operation_id("jules-create")
     marker = safe_name(f"LABEEB-{ctl.goal_id}-EXEC-{op_id}", 120)
     safety = "\n\nRemote-write boundary: no push, no PR creation, no merge, no production mutation, no remote ref changes. Return control if scope must widen."
@@ -444,7 +453,7 @@ def dispatch_jules(ctl: LabeebController, state: dict[str, Any]) -> None:
         "require_approval": bool(ctl.config.get("workflow.jules_require_plan_approval", False)),
     }
     ctl.prepare_effect(state, "jules_create", payload, "WAITING_JULES")
-    ctl.record_event("jules.dispatch_prepared", {"marker": marker})
+    ctl.record_event("jules.dispatch_prepared", {"marker": marker, "execution_round": state["execution_rounds"]})
 
 
 def handle_review_decision(ctl: LabeebController, state: dict[str, Any], decision: dict[str, Any]) -> None:
@@ -458,7 +467,71 @@ def handle_review_decision(ctl: LabeebController, state: dict[str, Any], decisio
             return
         ctl.pass_goal(state, decision, evidence)
         return
-    if action == "REPAIR":
+    if action in {"RETURN_TO_THINKING", ReasoningDecisionAction.RETURN_TO_THINKING}:
+        max_rounds = int(ctl.config.get("planning.max_execution_rounds", 2))
+        current_rounds = int(state.get("execution_rounds", 0))
+        if current_rounds >= max_rounds:
+            ctl.fail(state, f"Cannot return to thinking: reached maximum execution rounds ({max_rounds})", evidence=decision)
+            return
+
+        invalidate_roots = list(decision.get("invalidate_roots") or [])
+        if not invalidate_roots:
+            invalidate_roots = [SOLUTION_CANDIDATES]
+
+        ctl.artifact_store.invalidate_artifacts(state, invalidate_roots)
+
+        state["macro_phase"] = "THINKING"
+        raw_target = invalidate_roots[0] if invalidate_roots else ReasoningActivity.SOLUTION_EXPLORATION
+        target_activity = ARTIFACT_TO_ACTIVITY.get(raw_target, raw_target)
+        state["current_activity"] = target_activity
+        ctl.store.save(state)
+
+        ctl.record_event(
+            "reasoning.returned_to_thinking",
+            {
+                "reason": decision.get("reason"),
+                "invalidate_roots": invalidate_roots,
+                "target_activity": target_activity,
+                "execution_rounds": current_rounds,
+                "repair_reserved": bool(state.get("repair_reserved", False)),
+            },
+        )
+
+        source_task = state.get("latest_codex_task_id")
+        contract = read_ref_json(state["contract_ref"])
+        valid_artifacts = {
+            k: read_ref_json(v["ref"])
+            for k, v in state.get("artifacts", {}).items()
+            if v.get("validity") == ArtifactValidity.VALID
+        }
+        prompt = activity_brain_prompt(target_activity, contract, valid_artifacts, ctl.config)
+        op_id = new_operation_id(f"brain-{target_activity}")
+        if source_task:
+            ctl.prepare_effect(
+                state,
+                "brain_resume",
+                {
+                    "role": str(ctl.config.get("workflow.brain_role", "brain")),
+                    "source_task_id": source_task,
+                    "prompt": prompt,
+                    "task_name": task_name(ctl.goal_id, "brain", op_id),
+                },
+                "THINKING",
+            )
+        else:
+            ctl.prepare_effect(
+                state,
+                "brain_launch",
+                {
+                    "role": str(ctl.config.get("workflow.brain_role", "brain")),
+                    "prompt": prompt,
+                    "task_name": task_name(ctl.goal_id, "brain", op_id),
+                    "workspace": contract["workspace"],
+                },
+                "THINKING",
+            )
+        return
+    if action in {"REPAIR", ReasoningDecisionAction.TARGETED_REPAIR}:
         if state.get("repair_reserved"):
             ctl.fail(state, "Result still requires repair after the single V1 repair budget was consumed", evidence=decision)
             return
