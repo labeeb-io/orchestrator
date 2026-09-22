@@ -8,15 +8,22 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from labeeb.config import critic_needed
+from labeeb.core.convergence import ReasoningProgressTracker
 from labeeb.core.state_machine import (
+    activity_brain_prompt,
     convergence_prompt,
     critic_prompt,
     event_brain_prompt,
+    validate_activity_transition,
 )
 from labeeb.errors import ControllerError
 from labeeb.models import (
     CRITIC_END,
     CRITIC_START,
+    ArtifactStatus,
+    ArtifactValidity,
+    ReasoningActivity,
+    ReasoningDecisionAction,
     new_operation_id,
     safe_name,
     task_name,
@@ -30,8 +37,207 @@ if TYPE_CHECKING:
     from labeeb.core.controller import LabeebController
 
 
+def handle_reasoning_decision(ctl: LabeebController, state: dict[str, Any], decision: dict[str, Any]) -> None:
+    """Process structured reasoning activity decision envelope."""
+    action = str(decision.get("decision") or decision.get("action") or "").strip()
+    reason = str(decision.get("reason") or "")
+
+    if action == ReasoningDecisionAction.BLOCKED:
+        ctl.block(state, reason or "Reasoning blocked", evidence=decision)
+        return
+
+    if action == ReasoningDecisionAction.FAIL:
+        ctl.fail(state, reason or "Reasoning failed", evidence=decision)
+        return
+
+    current_activity = str(
+        decision.get("current_activity") or state.get("current_activity") or ReasoningActivity.GOAL_CONTRACT
+    )
+    activity_status = str(decision.get("activity_status") or ArtifactStatus.SATISFIED)
+    not_applicable_reason = decision.get("not_applicable_reason")
+    next_activity = decision.get("next_activity")
+    invalidate_roots = list(decision.get("invalidate_roots") or [])
+    evidence_refs = list(decision.get("evidence_refs") or [])
+    produced = decision.get("produced_artifact")
+    human_cp = decision.get("human_checkpoint") or {}
+
+    # Check for human checkpoint request
+    if human_cp.get("needed") or action == ReasoningDecisionAction.NEEDS_HUMAN:
+        state["phase"] = "PLAN_GATE"
+        state["human_checkpoint"] = human_cp
+        ctl.store.save(state)
+        ctl.record_event(
+            "reasoning.human_checkpoint_needed",
+            {"activity": current_activity, "checkpoint": human_cp},
+        )
+        return
+
+    # Persist produced artifact if present
+    produced_art_type: str | None = None
+    if produced and isinstance(produced, dict):
+        produced_art_type = produced.get("artifact_type") or current_activity
+        art_data = produced.get("data") or {}
+        ctl.artifact_store.write_artifact(
+            state=state,
+            artifact_type=produced_art_type,
+            data=art_data,
+            producer=str(ctl.config.get("workflow.brain_role", "brain")),
+            evidence_refs=evidence_refs,
+            activity_status=activity_status,
+            not_applicable_reason=not_applicable_reason,
+            allow_stale_dependency=False,
+        )
+
+    # Invalidate requested roots and cascading downstream artifacts (excluding the artifact just produced)
+    if invalidate_roots:
+        exclude_set = [produced_art_type] if produced_art_type else None
+        ctl.artifact_store.invalidate_artifacts(state, invalidate_roots, exclude=exclude_set)
+
+    # Validate transition against transition matrix
+    validate_activity_transition(current_activity, next_activity)
+
+    # Check progress via ReasoningProgressTracker
+    max_steps = int(ctl.config.get("planning.max_reasoning_steps", 25))
+    max_repeats = int(ctl.config.get("planning.max_activity_repeats", 3))
+    progress_ok, progress_msg = ReasoningProgressTracker.record_step(
+        state=state,
+        current_activity=current_activity,
+        produced_artifact_data=produced.get("data") if produced else None,
+        evidence_refs=evidence_refs,
+        activity_status=activity_status,
+        max_steps=max_steps,
+        max_repeats=max_repeats,
+    )
+    if not progress_ok:
+        ctl.block(state, progress_msg, evidence=decision)
+        return
+
+    # Record history
+    history = state.setdefault("reasoning_history", [])
+    history.append(
+        {
+            "activity": current_activity,
+            "status": activity_status,
+            "not_applicable_reason": not_applicable_reason,
+            "next_activity": next_activity,
+            "at": utc_now(),
+        }
+    )
+    ctl.record_event(
+        "reasoning.activity_completed",
+        {
+            "activity": current_activity,
+            "status": activity_status,
+            "next": next_activity,
+        },
+    )
+
+    if action == ReasoningDecisionAction.IMPLEMENTATION_READY:
+        handle_implementation_readiness_request(ctl, state, decision)
+        return
+
+    if action == ReasoningDecisionAction.CONTINUE_REASONING:
+        if not next_activity:
+            ctl.block(state, "CONTINUE_REASONING decision missing next_activity", evidence=decision)
+            return
+        state["current_activity"] = next_activity
+        ctl.store.save(state)
+        # Prepare brain resume for next activity
+        source_task = state.get("latest_codex_task_id")
+        contract = read_ref_json(state["contract_ref"])
+        valid_artifacts = {
+            k: read_ref_json(v["ref"])
+            for k, v in state.get("artifacts", {}).items()
+            if v.get("validity") == ArtifactValidity.VALID
+        }
+        prompt = activity_brain_prompt(next_activity, contract, valid_artifacts, ctl.config)
+        op_id = new_operation_id(f"brain-{next_activity}")
+        if source_task:
+            ctl.prepare_effect(
+                state,
+                "brain_resume",
+                {
+                    "role": str(ctl.config.get("workflow.brain_role", "brain")),
+                    "source_task_id": source_task,
+                    "prompt": prompt,
+                    "task_name": task_name(ctl.goal_id, "brain", op_id),
+                },
+                "THINKING",
+            )
+        else:
+            ctl.prepare_effect(
+                state,
+                "brain_launch",
+                {
+                    "role": str(ctl.config.get("workflow.brain_role", "brain")),
+                    "prompt": prompt,
+                    "task_name": task_name(ctl.goal_id, "brain", op_id),
+                    "workspace": contract["workspace"],
+                },
+                "THINKING",
+            )
+        return
+
+    ctl.block(state, f"Unhandled reasoning action: {action}", evidence=decision)
+
+
+def handle_implementation_readiness_request(
+    ctl: LabeebController, state: dict[str, Any], decision: dict[str, Any]
+) -> None:
+    """Handle IMPLEMENTATION_READY decision."""
+    contract_seed = read_ref_json(state["contract_ref"])
+    produced = decision.get("produced_artifact") or {}
+    execution = (
+        decision.get("execution")
+        or (produced.get("data", {}) if isinstance(produced, dict) else {}).get("execution")
+        or {}
+    )
+
+    seed_allowed = list(contract_seed.get("allowed_paths") or [])
+    model_allowed = list(execution.get("allowed_paths") or [])
+    if seed_allowed:
+        for path in model_allowed:
+            if not path_allowed(path, seed_allowed):
+                ctl.block(state, f"Plan widened allowed path outside user authority: {path}")
+                return
+        allowed_paths = model_allowed or seed_allowed
+    else:
+        allowed_paths = model_allowed
+
+    seed_validation = list(contract_seed.get("validation_commands") or [])
+    validation = seed_validation or list(execution.get("validation_commands") or [])
+    risk_tags = sorted(set(contract_seed.get("risk_tags") or []) | set(execution.get("risk_tags") or []))
+
+    merged_contract = dict(contract_seed)
+    merged_contract["allowed_paths"] = allowed_paths
+    merged_contract["validation_commands"] = validation
+    merged_contract["risk_tags"] = risk_tags
+    state["contract_ref"] = ctl.store.write_json(ctl.paths.contract, merged_contract)
+
+    plan_payload = {
+        "plan_summary": decision.get("plan_summary") or decision.get("reason"),
+        "execution": {
+            **execution,
+            "allowed_paths": allowed_paths,
+            "validation_commands": validation,
+            "risk_tags": risk_tags,
+        },
+        "planning_decision": decision,
+        "at": utc_now(),
+    }
+    state["plan_ref"] = ctl.store.write_json(ctl.paths.plan, plan_payload)
+    state["phase"] = "PLAN_GATE"
+    ctl.store.save(state)
+    ctl.record_event("plan.ready", {"plan": plan_payload})
+    ctl.approve_plan_if_authorized(state)
+
+
 def handle_plan_decision(ctl: LabeebController, state: dict[str, Any], decision: dict[str, Any]) -> None:
     """Process structured planning decision from the Brain."""
+    if "decision" in decision or "current_activity" in decision:
+        handle_reasoning_decision(ctl, state, decision)
+        return
+
     if decision.get("action") == "BLOCKED":
         ctl.block(state, str(decision.get("reason") or "Planning blocked"), evidence=decision)
         return

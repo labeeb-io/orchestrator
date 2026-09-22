@@ -59,6 +59,10 @@ class GoalPaths:
         return self.root / "STOP"
 
     @property
+    def artifacts(self) -> pathlib.Path:
+        return self.root / "artifacts"
+
+    @property
     def events(self) -> pathlib.Path:
         return self.root / "events.jsonl"
 
@@ -111,6 +115,23 @@ def atomic_json_write(path: pathlib.Path, payload: Any) -> None:
     atomic_text_write(path, json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n")
 
 
+def migrate_state_v1_to_v2(state: dict[str, Any]) -> dict[str, Any]:
+    """Hydrate state with V2 fields if missing, without fabricating artifacts."""
+    if "artifacts" not in state:
+        state["artifacts"] = {}
+    if "macro_phase" not in state:
+        state["macro_phase"] = state.get("phase", "CREATED")
+    if "execution_rounds" not in state:
+        state["execution_rounds"] = 0
+    if "proof_path_locked" not in state:
+        state["proof_path_locked"] = False
+    if "path_integrity_status" not in state:
+        state["path_integrity_status"] = "ORIGINAL"
+    if "reasoning_history" not in state:
+        state["reasoning_history"] = []
+    return state
+
+
 class GoalStore:
     def __init__(self, paths: GoalPaths):
         self.paths = paths
@@ -118,7 +139,7 @@ class GoalStore:
 
     def init_dirs(self) -> None:
         self.paths.root.mkdir(parents=True, exist_ok=True)
-        for p in (self.paths.requests, self.paths.reviews, self.paths.evidence):
+        for p in (self.paths.requests, self.paths.reviews, self.paths.evidence, self.paths.artifacts):
             p.mkdir(parents=True, exist_ok=True)
         self.paths.lock.touch(exist_ok=True)
 
@@ -128,10 +149,13 @@ class GoalStore:
         with self.lock.locked():
             yield
 
-    def load(self) -> dict[str, Any]:
+    def load(self, migrate: bool = True) -> dict[str, Any]:
         if not self.paths.state.exists():
             raise ControllerError(f"Missing state: {self.paths.state}")
-        return json.loads(self.paths.state.read_text())
+        state = json.loads(self.paths.state.read_text())
+        if migrate:
+            state = migrate_state_v1_to_v2(state)
+        return state
 
     def save(self, state: dict[str, Any]) -> None:
         state["updated_at"] = utc_now()

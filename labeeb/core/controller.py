@@ -14,6 +14,7 @@ from typing import Any
 
 from labeeb.config import Config, critic_needed, expand, risk_matches, role_config
 from labeeb.core import decisions, repair
+from labeeb.core.artifacts import GoalArtifactStore
 from labeeb.core.effects import EffectManager
 from labeeb.core.events import (
     append_domain_event,
@@ -79,6 +80,7 @@ class LabeebController:
         self.effects = EffectManager(config, self.paths, self.store, self.orchestrator, self.jules)
         self.effects.jules_get_fn = lambda sid, check=False: self.jules_get(sid, check=check)
         self.effects.jules_logs_fn = lambda sid, check=False: self.jules_logs(sid, check=check)
+        self.artifact_store = GoalArtifactStore(self.paths, self.store)
 
     # ----------------------------- facade & backward compatibility -----------------------------
     def jules_get(self, session_id: str, check: bool = True) -> dict[str, Any] | None:
@@ -182,6 +184,13 @@ class LabeebController:
             "contract_ref": contract_ref,
             "plan_ref": None,
             "phase": "CREATED",
+            "macro_phase": "THINKING",
+            "current_activity": "goal_contract",
+            "artifacts": {},
+            "execution_rounds": 0,
+            "proof_path_locked": False,
+            "path_integrity_status": "ORIGINAL",
+            "reasoning_history": [],
             "deadline": deadline_after(hours),
             "latest_codex_task_id": None,
             "active_task": None,
