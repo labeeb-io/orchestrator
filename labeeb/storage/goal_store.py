@@ -66,6 +66,14 @@ class GoalPaths:
     def events(self) -> pathlib.Path:
         return self.root / "events.jsonl"
 
+    @property
+    def final_report_md(self) -> pathlib.Path:
+        return self.root / "final_report.md"
+
+    @property
+    def final_report_json(self) -> pathlib.Path:
+        return self.root / "final_report.json"
+
 
 def file_ref(path: pathlib.Path) -> str:
     return f"file:{path.resolve()}#sha256={sha256_bytes(path.read_bytes())}"

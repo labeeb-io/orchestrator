@@ -81,6 +81,8 @@ class LabeebController:
         self.effects.jules_get_fn = lambda sid, check=False: self.jules_get(sid, check=check)
         self.effects.jules_logs_fn = lambda sid, check=False: self.jules_logs(sid, check=check)
         self.artifact_store = GoalArtifactStore(self.paths, self.store)
+        from labeeb.core.reporting import FinalReportGenerator
+        self.report_generator = FinalReportGenerator(self)
 
     # ----------------------------- facade & backward compatibility -----------------------------
     def jules_get(self, session_id: str, check: bool = True) -> dict[str, Any] | None:
@@ -282,12 +284,19 @@ class LabeebController:
             self.paths.stop_request.unlink()
 
     def block(self, state: dict[str, Any], reason: str, *, evidence: Any = None) -> None:
+        state["macro_phase"] = "REPORTING"
+        with contextlib.suppress(Exception):
+            self.report_generator.generate_and_save(state, "BLOCKED", reason=reason, evidence=evidence)
         result = {
             "status": "BLOCKED",
             "reason": reason,
             "evidence": evidence,
             "at": utc_now(),
         }
+        if state.get("final_report_ref"):
+            result["final_report_ref"] = state["final_report_ref"]
+        if state.get("final_report_md_ref"):
+            result["final_report_md_ref"] = state["final_report_md_ref"]
         state["result_ref"] = self.store.write_json(self.paths.results, result)
         state["phase"] = "BLOCKED"
         state["active_task"] = None
@@ -303,7 +312,14 @@ class LabeebController:
         self.record_event("goal.blocked", {"reason": reason})
 
     def fail(self, state: dict[str, Any], reason: str, *, evidence: Any = None) -> None:
+        state["macro_phase"] = "REPORTING"
+        with contextlib.suppress(Exception):
+            self.report_generator.generate_and_save(state, "FAIL", reason=reason, evidence=evidence)
         result = {"status": "FAIL", "reason": reason, "evidence": evidence, "at": utc_now()}
+        if state.get("final_report_ref"):
+            result["final_report_ref"] = state["final_report_ref"]
+        if state.get("final_report_md_ref"):
+            result["final_report_md_ref"] = state["final_report_md_ref"]
         state["result_ref"] = self.store.write_json(self.paths.results, result)
         state["phase"] = "FAIL"
         state["active_task"] = None
@@ -313,12 +329,20 @@ class LabeebController:
         self.record_event("goal.failed", {"reason": reason})
 
     def pass_goal(self, state: dict[str, Any], decision: dict[str, Any], evidence: dict[str, Any]) -> None:
+        state["macro_phase"] = "REPORTING"
+        reason = str(decision.get("reason") or "Goal acceptance criteria verified")
+        with contextlib.suppress(Exception):
+            self.report_generator.generate_and_save(state, "PASS", reason=reason, evidence=evidence)
         result = {
             "status": "PASS",
             "decision": decision,
             "evidence": evidence,
             "at": utc_now(),
         }
+        if state.get("final_report_ref"):
+            result["final_report_ref"] = state["final_report_ref"]
+        if state.get("final_report_md_ref"):
+            result["final_report_md_ref"] = state["final_report_md_ref"]
         state["result_ref"] = self.store.write_json(self.paths.results, result)
         state["phase"] = "PASS"
         state["active_task"] = None
@@ -678,6 +702,12 @@ class LabeebController:
         if state.get("plan_ref"):
             with contextlib.suppress(Exception):
                 view["plan"] = read_ref_json(state["plan_ref"])
+        if state.get("final_report_ref"):
+            with contextlib.suppress(Exception):
+                view["final_report"] = read_ref_json(state["final_report_ref"])
+        if self.paths.final_report_md.exists():
+            with contextlib.suppress(Exception):
+                view["final_report_md"] = self.paths.final_report_md.read_text(encoding="utf-8")
         return view
 
     def start_background(self, argv0: str | None = None) -> int:
