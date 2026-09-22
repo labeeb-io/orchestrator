@@ -1,0 +1,105 @@
+# Labeeb Orchestrator V1
+# Python 3.11+ only; no third-party Python packages.
+
+[controller]
+state_root = "~/.local/state/labeeb-controller"
+poll_seconds = 20
+agent_poll_seconds = 5
+goal_deadline_hours = 12
+reconcile_attempts = 3
+reconcile_delay_seconds = 5
+jules_read_failure_limit = 4
+max_handled_event_keys = 100
+max_prompt_evidence_chars = 70000
+keep_validation_worktrees = false
+brain_transient_retry_limit = 3
+brain_retry_backoff_seconds = 5
+
+[executables]
+# If Orchestrator lives only under NVM, replace this with its absolute path.
+orchestrator = "orchestrator"
+cjules = "cjules"
+git = "git"
+shell = "/bin/bash"
+
+[orchestrator]
+task_store = "~/.orchestrator/tasks"
+
+[timeouts]
+launch_seconds = 120
+orchestrator_read_wait_ms = 300000
+jules_read_seconds = 90
+jules_write_seconds = 120
+critic_seconds = 900
+validation_command_seconds = 900
+repair_activation_seconds = 600
+
+[workflow]
+brain_role = "brain"
+critic_role = "critic"
+implementer_role = "implementer"
+
+# never | high_risk | always
+pre_critic = "high_risk"
+post_critic = "high_risk"
+high_risk_tags = ["architecture", "concurrency", "persistence", "security", "public_contract", "large_blast_radius"]
+
+# Jules plan approval remains explicit unless your Goal Contract already delegates it.
+jules_require_plan_approval = false
+
+# If a correction sent to a COMPLETED Jules session produces no new work in
+# repair_activation_seconds: blocked | new_session
+repair_fallback = "blocked"
+
+# 0 = keep the same provider thread. A positive number launches a fresh brain
+# after that many resumes using the persisted contract/plan/evidence packet.
+max_brain_resumes_per_thread = 0
+
+[safety]
+max_repair_rounds = 1
+require_patch_for_implementation = true
+require_validation_for_pass = true
+critic_failure_blocks_high_risk = true
+allow_push = false
+allow_pr = false
+allow_merge = false
+allow_production_mutation = false
+
+# These actions are customizable, but the controller still enforces its safety
+# invariants (single writer, no blind write retry, one repair, no remote publish).
+# Allowed action values: wait | wake | review | block
+[jules_state_actions]
+QUEUED = "wait"
+PLANNING = "wait"
+IN_PROGRESS = "wait"
+AWAITING_PLAN_APPROVAL = "wake"
+AWAITING_USER_FEEDBACK = "wake"
+PAUSED = "wake"
+COMPLETED = "review"
+FAILED = "wake"
+CANCELLED = "wake"
+UNKNOWN = "block"
+
+# Roles are replaceable without editing controller code.
+[roles.brain]
+transport = "orchestrator"
+runtime = "codex"
+model = ""
+
+# Read-only critic. This invokes Claude directly so the no-tools flags are
+# technically enforced instead of relying on prompt text alone. It inherits
+# your existing Claude/Bifrost environment.
+[roles.critic]
+transport = "direct"
+read_only = true
+timeout_seconds = 900
+command = ["claude", "-p", "--tools", "", "--strict-mcp-config", "--output-format", "json", "--model", "opus"]
+
+[roles.implementer]
+transport = "jules"
+command = "cjules"
+
+# Optional prompt overrides. Leave empty to use the controller's tested
+# structured prompts. `brain_initial` may use {contract_json}.
+[prompts]
+brain_initial = ""
