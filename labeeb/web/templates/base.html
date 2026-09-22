@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Labeeb Orchestrator{% endblock %}</title>
+  <link rel="stylesheet" href="/static/app.css">
+  <script src="/static/htmx.min.js"></script>
+  <script src="/static/app.js" defer></script>
+  {% block head %}{% endblock %}
+</head>
+<body>
+  <div class="app-shell">
+    <!-- Left Navigation Sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar-brand">
+        <div class="brand-icon">L</div>
+        <div>
+          <div class="brand-title">Labeeb Control</div>
+        </div>
+        <span class="brand-version">v1.1</span>
+      </div>
+
+      <nav class="sidebar-nav">
+        <a href="/dashboard" class="nav-link {% if active_page == 'dashboard' %}active{% endif %}">
+          <span style="font-size: 15px;">📊</span> Dashboard
+        </a>
+        <a href="/goals/new" class="nav-link {% if active_page == 'goal_new' %}active{% endif %}">
+          <span style="font-size: 15px;">➕</span> New Goal
+        </a>
+        <a href="/config" class="nav-link {% if active_page == 'config' %}active{% endif %}">
+          <span style="font-size: 15px;">⚙️</span> Configuration
+        </a>
+        <a href="/doctor" class="nav-link {% if active_page == 'doctor' %}active{% endif %}">
+          <span style="font-size: 15px;">🩺</span> Diagnostics
+        </a>
+      </nav>
+
+      <div class="sidebar-footer">
+        <a href="/doctor" style="text-decoration: none; color: inherit;" class="system-pill">
+          <span class="status-dot"></span>
+          <span>Engine Online</span>
+        </a>
+        <span style="font-family: var(--font-mono); font-size: 11px;">127.0.0.1</span>
+      </div>
+    </aside>
+
+    <!-- Main Workspace -->
+    <div class="main-wrapper">
+      <header class="top-header">
+        <div class="header-title-wrap">
+          {% block header_title %}
+            <h1 class="header-title">Engineering Dashboard</h1>
+          {% endblock %}
+        </div>
+        <div class="header-actions">
+          {% block header_actions %}
+            <a href="/goals/new" class="btn btn-primary btn-sm">+ New Goal</a>
+          {% endblock %}
+        </div>
+      </header>
+
+      <main class="content-viewport" id="main-content">
+        {% block content %}{% endblock %}
+      </main>
+    </div>
+  </div>
+</body>
+</html>

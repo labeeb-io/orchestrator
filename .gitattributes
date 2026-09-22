@@ -1,0 +1,2 @@
+# Keep repository text files normalized to LF regardless of host Git settings.
+* text=auto eol=lf

@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard — Labeeb Orchestrator{% endblock %}
+
+{% block header_title %}
+  <h1 class="header-title">Orchestration Goals</h1>
+{% endblock %}
+
+{% block content %}
+<div id="goals-container" hx-get="/dashboard" hx-trigger="every 15s, goalUpdated from:body" hx-select="#goals-container" hx-swap="outerHTML">
+
+  <!-- Summary Stats Bar -->
+  <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px;">
+    <div class="card" style="margin-bottom: 0; padding: 14px 18px;">
+      <div style="font-size: 12px; color: var(--text-muted); font-weight: 500;">TOTAL GOALS</div>
+      <div style="font-size: 24px; font-weight: 700; margin-top: 4px; font-family: var(--font-mono);">{{ goals | length }}</div>
+    </div>
+    
+    <div class="card" style="margin-bottom: 0; padding: 14px 18px; border-left: 3px solid var(--color-active-border);">
+      <div style="font-size: 12px; color: var(--color-active-text); font-weight: 500;">ACTIVE IN-FLIGHT</div>
+      {% set active_count = goals | selectattr('phase', 'in', ['CREATED', 'THINKING', 'PLAN_GATE', 'EFFECT', 'WAITING_JULES', 'REVIEWING', 'VALIDATING']) | list | length %}
+      <div style="font-size: 24px; font-weight: 700; margin-top: 4px; font-family: var(--font-mono);">{{ active_count }}</div>
+    </div>
+
+    <div class="card" style="margin-bottom: 0; padding: 14px 18px; border-left: 3px solid var(--color-pass-border);">
+      <div style="font-size: 12px; color: var(--color-pass-text); font-weight: 500;">PASSED</div>
+      {% set pass_count = goals | selectattr('phase', 'equalto', 'PASS') | list | length %}
+      <div style="font-size: 24px; font-weight: 700; margin-top: 4px; font-family: var(--font-mono);">{{ pass_count }}</div>
+    </div>
+
+    <div class="card" style="margin-bottom: 0; padding: 14px 18px; border-left: 3px solid var(--color-fail-border);">
+      <div style="font-size: 12px; color: var(--color-fail-text); font-weight: 500;">ATTENTION NEEDED</div>
+      {% set attention_count = goals | selectattr('phase', 'in', ['BLOCKED', 'FAIL']) | list | length %}
+      <div style="font-size: 24px; font-weight: 700; margin-top: 4px; font-family: var(--font-mono);">{{ attention_count }}</div>
+    </div>
+  </div>
+
+  <!-- Active Goals Section -->
+  <div style="margin-bottom: 32px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
+      <h2 style="font-size: 15px; font-weight: 600; color: var(--text-primary); display: flex; align-items: center; gap: 8px;">
+        <span style="width: 8px; height: 8px; border-radius: 50%; background-color: #58a6ff; display: inline-block;"></span>
+        Active & In-Progress Goals
+      </h2>
+      <span style="font-size: 12px; color: var(--text-muted); font-family: var(--font-mono);">Live Auto-Syncing</span>
+    </div>
+
+    {% set active_goals = goals | selectattr('phase', 'in', ['CREATED', 'THINKING', 'PLAN_GATE', 'EFFECT', 'WAITING_JULES', 'REVIEWING', 'VALIDATING', 'AWAITING_PLAN_APPROVAL', 'AWAITING_USER_FEEDBACK', 'PAUSED']) | list %}
+    {% if active_goals %}
+      <div class="goal-grid">
+        {% for goal in active_goals %}
+          {% include "partials/goal_card.html" %}
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="card" style="text-align: center; padding: 40px 20px; background-color: var(--bg-surface);">
+        <div style="font-size: 32px; margin-bottom: 12px;">☕</div>
+        <h3 style="font-size: 15px; font-weight: 600; margin-bottom: 6px;">No active goals running</h3>
+        <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 16px;">Create a new goal to begin automated multi-agent orchestration.</p>
+        <a href="/goals/new" class="btn btn-primary btn-sm">+ Launch New Goal</a>
+      </div>
+    {% endif %}
+  </div>
+
+  <!-- Recent / Completed Goals Section -->
+  <div>
+    <h2 style="font-size: 15px; font-weight: 600; color: var(--text-primary); margin-bottom: 14px;">
+      Recent Terminal Goals (PASS / FAIL / BLOCKED)
+    </h2>
+
+    {% set terminal_goals = goals | selectattr('phase', 'in', ['PASS', 'FAIL', 'BLOCKED']) | list %}
+    {% if terminal_goals %}
+      <div class="goal-grid">
+        {% for goal in terminal_goals %}
+          {% include "partials/goal_card.html" %}
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="card" style="padding: 24px; color: var(--text-muted); font-size: 13px;">
+        No completed goals recorded in this state directory yet.
+      </div>
+    {% endif %}
+  </div>
+
+</div>
+{% endblock %}
