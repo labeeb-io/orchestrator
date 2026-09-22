@@ -7,7 +7,7 @@ import pathlib
 import re
 import subprocess
 from typing import Any
-from fastapi import APIRouter, Query, Request
+from fastapi import APIRouter, Query
 
 router = APIRouter(prefix="/api/workspaces", tags=["workspaces"])
 

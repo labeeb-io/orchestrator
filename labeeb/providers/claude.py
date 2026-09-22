@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import contextlib
 import json
-import shutil
 from typing import Any
 
 from labeeb.config import Config, expand, role_config

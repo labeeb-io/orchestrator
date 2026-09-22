@@ -8,11 +8,10 @@ from __future__ import annotations
 import time
 from typing import TYPE_CHECKING, Any
 
-from labeeb.core.events import DomainEvent, global_event_bus
 from labeeb.storage.goal_store import read_ref_json
-from labeeb.core.state_machine import event_brain_prompt, initial_brain_prompt, task_name
+from labeeb.core.state_machine import event_brain_prompt, initial_brain_prompt
 from labeeb.errors import ControllerError
-from labeeb.models import new_operation_id, utc_now
+from labeeb.models import new_operation_id, task_name
 
 if TYPE_CHECKING:
     from labeeb.core.controller import LabeebController

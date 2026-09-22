@@ -4,22 +4,14 @@ from __future__ import annotations
 import textwrap
 from typing import Any
 
-from labeeb.config import Config, critic_needed
-from labeeb.errors import ControllerError
+from labeeb.config import Config
 from labeeb.models import (
     CRITIC_END,
     CRITIC_START,
     DECISION_END,
     DECISION_START,
     format_json_for_prompt,
-    new_operation_id,
-    task_name,
-    utc_now,
 )
-from labeeb.providers.base import extract_enveloped_json
-from labeeb.providers.claude import ClaudeCriticProvider
-from labeeb.providers.jules import path_allowed
-from labeeb.storage.goal_store import GoalPaths, GoalStore, read_ref_json
 
 
 def initial_brain_prompt(contract_seed: dict[str, Any], config: Config) -> str:

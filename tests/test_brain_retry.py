@@ -1,13 +1,11 @@
 """Tests for brain transient retry and unblock-and-retry features."""
-import json
 import pathlib
 import tempfile
 import unittest
 
-from labeeb.config import Config, load_config
+from labeeb.config import load_config
 from labeeb.core.controller import LabeebController
 from labeeb.errors import ControllerError
-from labeeb.models import DECISION_START, DECISION_END
 from labeeb.providers.fakes import FakeCriticProvider, FakeJulesProvider, FakeOrchestratorProvider
 
 

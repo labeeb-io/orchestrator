@@ -8,12 +8,10 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from labeeb.config import critic_needed
-from labeeb.core.events import DomainEvent, global_event_bus
 from labeeb.core.state_machine import (
     convergence_prompt,
     critic_prompt,
     event_brain_prompt,
-    task_name,
 )
 from labeeb.errors import ControllerError
 from labeeb.models import (
@@ -21,6 +19,7 @@ from labeeb.models import (
     CRITIC_START,
     new_operation_id,
     safe_name,
+    task_name,
     utc_now,
 )
 from labeeb.providers.base import extract_enveloped_json

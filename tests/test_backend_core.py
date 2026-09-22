@@ -4,10 +4,9 @@ import tempfile
 import unittest
 
 from labeeb.config import Config, load_config, validate_config
-from labeeb.core.controller import LabeebController, doctor
-from labeeb.errors import ConfigError, ControllerError
+from labeeb.core.controller import LabeebController
+from labeeb.errors import ConfigError
 from labeeb.providers.fakes import FakeCriticProvider, FakeJulesProvider, FakeOrchestratorProvider
-from labeeb.storage.goal_store import GoalPaths, GoalStore, read_ref_json
 
 BASE_CONFIG = r"""
 [controller]

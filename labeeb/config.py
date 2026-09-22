@@ -8,7 +8,7 @@ import shutil
 import tomllib
 from typing import Any
 
-from labeeb.errors import ConfigError, ControllerError
+from labeeb.errors import ConfigError
 
 
 @dataclasses.dataclass

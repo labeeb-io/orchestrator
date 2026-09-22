@@ -1,19 +1,16 @@
 """Regression test suite for Group 1 (Core Safety), Task 9 (Asset Sanitization), and Group 3 (Web & API Bugs)."""
-import os
 import pathlib
 import tempfile
 import unittest
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 from fastapi.testclient import TestClient
 
 from labeeb.api.app import create_app
 from labeeb.config import load_config
 from labeeb.core.controller import LabeebController
-from labeeb.core.events import append_domain_event, read_domain_events
-from labeeb.core.recovery import unblock_goal
+from labeeb.core.events import read_domain_events
 from labeeb.errors import ControllerError
-from labeeb.models import DomainEvent, utc_now
 
 BASE_CONFIG = r"""
 [controller]

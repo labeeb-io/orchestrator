@@ -8,7 +8,6 @@ import os
 import pathlib
 import subprocess
 import sys
-import textwrap
 import time
 import uuid
 from typing import Any
@@ -33,8 +32,6 @@ from labeeb.core.recovery import (
 from labeeb.core.validation import prepare_review_evidence, validate_evidence
 from labeeb.errors import ControllerError
 from labeeb.models import (
-    CRITIC_END,
-    CRITIC_START,
     DECISION_END,
     DECISION_START,
     TERMINAL_PHASES,
@@ -43,21 +40,19 @@ from labeeb.models import (
     deadline_after,
     new_operation_id,
     parse_utc,
-    safe_name,
     task_name,
     utc_now,
 )
 from labeeb.providers.base import extract_enveloped_json
 from labeeb.providers.claude import ClaudeCriticProvider
 from labeeb.providers.git import GitProvider
-from labeeb.providers.jules import JulesProvider, ordered_activities, path_allowed
+from labeeb.providers.jules import JulesProvider, ordered_activities
 from labeeb.providers.orchestrator import OrchestratorProvider
 from labeeb.storage.goal_store import (
     GoalPaths,
     GoalStore,
     atomic_text_write,
     read_ref_json,
-    read_ref_text,
 )
 
 

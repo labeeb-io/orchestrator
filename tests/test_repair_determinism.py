@@ -1,7 +1,5 @@
 """Unit and integration tests for Group 4: Repair & Jules Event Determinism (Tasks 15-20)."""
-import datetime as dt
 import pathlib
-import pytest
 from unittest.mock import MagicMock, patch
 
 from labeeb.config import Config
@@ -11,10 +9,9 @@ from labeeb.core.events import (
     has_repair_causality,
     jules_snapshot,
     meaningful_event,
-    ordered_activities,
 )
 from labeeb.core.repair import maybe_handle_repair_activation_timeout
-from labeeb.errors import AmbiguousEffect, CommandError
+from labeeb.errors import AmbiguousEffect
 from labeeb.providers.jules import JulesProvider
 from labeeb.storage.goal_store import GoalPaths, GoalStore
 

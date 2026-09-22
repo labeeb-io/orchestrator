@@ -9,7 +9,7 @@ import datetime as dt
 import textwrap
 from typing import TYPE_CHECKING, Any
 
-from labeeb.core.events import DomainEvent, global_event_bus, jules_snapshot
+from labeeb.core.events import jules_snapshot
 from labeeb.models import new_operation_id, parse_utc, safe_name, utc_now
 from labeeb.providers.jules import (
     activity_key,

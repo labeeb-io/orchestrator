@@ -1,4 +1,3 @@
-import json
 import pathlib
 import tempfile
 import unittest
@@ -254,7 +253,8 @@ class HappyPathIntegrationTest(unittest.TestCase):
         self.root = pathlib.Path(self.tmp.name)
         self.repo = self.root / "repo"
         self.repo.mkdir()
-        import subprocess, os
+        import subprocess
+        import os
         subprocess.run(["git", "init", "-q", str(self.repo)], check=True)
         subprocess.run(["git", "-C", str(self.repo), "config", "user.email", "test@example.com"], check=True)
         subprocess.run(["git", "-C", str(self.repo), "config", "user.name", "Test"], check=True)
@@ -270,7 +270,8 @@ class HappyPathIntegrationTest(unittest.TestCase):
         self.patch2_file.write_text(patch.replace("+hello", "+fixed"))
         self.orch_store = self.root / "orch"
         self.jules_store = self.root / "jules"
-        self.orch_store.mkdir(); self.jules_store.mkdir()
+        self.orch_store.mkdir()
+        self.jules_store.mkdir()
         self.fake_orch = self.root / "orchestrator"
         self.fake_jules = self.root / "cjules"
         self._write_fake_orchestrator()
