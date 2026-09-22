@@ -373,3 +373,26 @@ document.addEventListener('DOMContentLoaded', () => {
     onWorkspacePathChange(workspaceInput.value);
   }
 });
+
+// Instant client-side search filter for sidebar sessions
+function filterSidebarSessions(query) {
+  const q = (query || '').toLowerCase().trim();
+  const items = document.querySelectorAll('.sidebar-session-item');
+  let visibleCount = 0;
+
+  items.forEach(item => {
+    const text = (item.getAttribute('data-session-text') || '').toLowerCase();
+    if (!q || text.includes(q)) {
+      item.style.display = 'flex';
+      visibleCount++;
+    } else {
+      item.style.display = 'none';
+    }
+  });
+
+  const emptyHint = document.getElementById('sidebar-empty-sessions');
+  if (emptyHint) {
+    emptyHint.style.display = (visibleCount === 0 && q) ? 'block' : 'none';
+  }
+}
+

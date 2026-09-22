@@ -29,7 +29,39 @@ def to_pretty_json(val: Any) -> str:
         return str(val)
 
 
+def timeago_filter(iso_str: Any) -> str:
+    if not iso_str:
+        return ""
+    try:
+        from datetime import datetime, timezone
+        from labeeb.models import parse_utc
+        t = parse_utc(str(iso_str))
+        now = datetime.now(timezone.utc)
+        diff = max(0, int((now - t).total_seconds()))
+        if diff < 60:
+            return "now"
+        if diff < 3600:
+            return f"{diff // 60}m"
+        if diff < 86400:
+            return f"{diff // 3600}h"
+        return f"{diff // 86400}d"
+    except Exception:
+        return ""
+
+
 templates.env.filters["pretty_json"] = to_pretty_json
+templates.env.filters["timeago"] = timeago_filter
+
+
+def get_sidebar_goals(request: Request) -> list[dict[str, Any]]:
+    try:
+        config: Config = request.app.state.config
+        return LabeebController.list_goals(config)
+    except Exception:
+        return []
+
+
+templates.env.globals["get_sidebar_goals"] = get_sidebar_goals
 
 router = APIRouter(include_in_schema=False)
 
@@ -261,6 +293,7 @@ async def goal_detail_page(goal_id: str, request: Request):
         context={
             "request": request,
             "active_page": "dashboard",
+            "current_goal_id": goal_id,
             "goal": goal_status,
             "evidence": evidence,
             "raw_state_json": raw_state_json,
