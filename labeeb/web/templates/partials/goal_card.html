@@ -1,29 +1,32 @@
 <a href="/goals/{{ goal.goal_id }}" class="goal-card-item" id="goal-card-{{ goal.goal_id }}">
-  <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 8px;">
-    <div style="font-weight: 600; font-size: 14.5px; color: var(--text-primary); line-height: 1.35;">
-      {{ goal.intent | truncate(75) }}
+  <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 10px;">
+    <div style="display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 0;">
+      <span style="font-family: var(--font-mono); font-size: 11.5px; color: var(--color-fog); letter-spacing: -0.01em;">{{ goal.goal_id[:12] }}</span>
+      <div style="font-weight: 510; font-size: 14px; color: var(--color-paper); line-height: 1.4; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical;">
+        {{ goal.intent }}
+      </div>
     </div>
     {% set phase = goal.phase %}
     {% include "partials/stage_badge.html" %}
   </div>
 
-  <div style="display: flex; gap: 12px; font-size: 12px; color: var(--text-muted); font-family: var(--font-mono);">
+  <div style="display: flex; gap: 12px; font-size: 11.5px; color: var(--color-fog); font-family: var(--font-mono);">
     <span>📁 {{ goal.repo | truncate(25) }}</span>
     <span>🌿 {{ goal.branch | truncate(15) }}</span>
   </div>
 
-  <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border-subtle); padding-top: 10px; margin-top: 4px; font-size: 12px; color: var(--text-secondary);">
-    <div style="display: flex; gap: 8px; align-items: center;">
+  <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--color-graphite); padding-top: 10px; margin-top: 2px; font-size: 11.5px; color: var(--color-mist);">
+    <div style="display: flex; gap: 6px; align-items: center;">
       {% if goal.risk_tags %}
         {% for tag in goal.risk_tags[:2] %}
-          <span class="badge badge-neutral" style="font-size: 10.5px;">{{ tag }}</span>
+          <span class="badge badge-neutral" style="font-size: 10px; padding: 1px 6px;">{{ tag }}</span>
         {% endfor %}
       {% endif %}
       {% if goal.repair_reserved %}
-        <span class="badge badge-warn" style="font-size: 10.5px;">Repair 1/1</span>
+        <span class="badge badge-warn" style="font-size: 10px; padding: 1px 6px;">Repair 1/1</span>
       {% endif %}
     </div>
-    <span style="font-family: var(--font-mono); font-size: 11px; color: var(--text-muted);">
+    <span style="font-family: var(--font-mono); font-size: 11px; color: var(--color-ash);">
       {{ goal.created_at[:16].replace('T', ' ') if goal.created_at else '' }}
     </span>
   </div>

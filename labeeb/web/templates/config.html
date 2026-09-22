@@ -7,11 +7,11 @@
 {% endblock %}
 
 {% block content %}
-<div style="max-width: 820px; margin: 0 auto;">
+<div style="max-width: 840px; margin: 0 auto;">
   <div class="card tabs-container" style="padding: 0; overflow: hidden;">
-    <div class="tabs-nav" style="padding: 12px 20px 0 20px; background-color: var(--bg-surface-elevated); margin-bottom: 0;">
+    <div class="tabs-nav" style="padding: 10px 20px 0 20px; background-color: var(--color-carbon); margin-bottom: 0;">
       <button type="button" class="tab-btn active" data-tab="tab-visual-config">
-        <span>⚙️</span> Roles & Workflow Settings
+        <span>⚙️</span> Roles &amp; Workflow Settings
       </button>
       <button type="button" class="tab-btn" data-tab="tab-raw-toml">
         <span>📄</span> Raw TOML Editor
@@ -21,57 +21,57 @@
     <div style="padding: 24px;">
       <!-- Tab 1: Visual Settings -->
       <div id="tab-visual-config" class="tab-pane active">
-        <div class="card" style="background-color: var(--bg-surface-elevated); margin-bottom: 20px; border-left: 3px solid var(--border-active);">
-          <div style="font-weight: 600; margin-bottom: 4px;">Active Configuration File</div>
-          <div style="font-family: var(--font-mono); font-size: 12px; color: var(--text-secondary);">{{ config_path }}</div>
+        <div class="card" style="background-color: var(--color-obsidian); margin-bottom: 20px; border: 1px solid var(--color-graphite); padding: 14px 18px;">
+          <div style="font-weight: 510; font-size: 13px; color: var(--color-paper); margin-bottom: 4px;">Active Configuration File</div>
+          <div style="font-family: var(--font-mono); font-size: 12px; color: var(--color-fog);">{{ config_path }}</div>
         </div>
 
-        <h3 style="font-size: 15px; font-weight: 600; margin-bottom: 14px;">Configured Agent Roles</h3>
-        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 24px;">
-          <div class="card" style="margin-bottom: 0; padding: 14px;">
-            <div style="font-size: 12px; color: var(--text-muted);">BRAIN ROLE</div>
-            <div style="font-weight: 600; font-size: 14px; margin-top: 4px;">{{ config.get('roles.brain.runtime', config.get('workflow.brain_role', 'codex')) | upper }}</div>
-            <div style="font-size: 11.5px; color: var(--text-muted); margin-top: 2px;">Transport: {{ config.get('roles.brain.transport', 'orchestrator') }}</div>
+        <h3 style="font-size: 14px; font-weight: 510; color: var(--color-paper); margin-bottom: 14px;">Configured Agent Roles</h3>
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 24px;">
+          <div class="card" style="margin-bottom: 0; padding: 14px 16px; background-color: var(--color-obsidian); border: 1px solid var(--color-graphite);">
+            <div style="font-size: 11px; color: var(--color-fog); text-transform: uppercase; font-weight: 500; letter-spacing: 0.04em;">Brain Role</div>
+            <div style="font-weight: 510; font-size: 14px; color: var(--color-paper); margin-top: 4px; font-family: var(--font-mono);">{{ config.get('roles.brain.runtime', config.get('workflow.brain_role', 'codex')) | upper }}</div>
+            <div style="font-size: 11.5px; color: var(--color-ash); margin-top: 2px;">Transport: {{ config.get('roles.brain.transport', 'orchestrator') }}</div>
           </div>
 
-          <div class="card" style="margin-bottom: 0; padding: 14px;">
-            <div style="font-size: 12px; color: var(--text-muted);">CRITIC ROLE</div>
-            <div style="font-weight: 600; font-size: 14px; margin-top: 4px;">{{ config.get('roles.critic.runtime', 'claude') | upper }}</div>
-            <div style="font-size: 11.5px; color: var(--text-muted); margin-top: 2px;">Model: {{ config.get('roles.critic.model', 'claude-3-opus-20240229') }}</div>
+          <div class="card" style="margin-bottom: 0; padding: 14px 16px; background-color: var(--color-obsidian); border: 1px solid var(--color-graphite);">
+            <div style="font-size: 11px; color: var(--color-fog); text-transform: uppercase; font-weight: 500; letter-spacing: 0.04em;">Critic Role</div>
+            <div style="font-weight: 510; font-size: 14px; color: var(--color-paper); margin-top: 4px; font-family: var(--font-mono);">{{ config.get('roles.critic.runtime', 'claude') | upper }}</div>
+            <div style="font-size: 11.5px; color: var(--color-ash); margin-top: 2px;">Model: {{ config.get('roles.critic.model', 'claude-3-opus-20240229') }}</div>
           </div>
 
-          <div class="card" style="margin-bottom: 0; padding: 14px;">
-            <div style="font-size: 12px; color: var(--text-muted);">IMPLEMENTER</div>
-            <div style="font-weight: 600; font-size: 14px; margin-top: 4px;">{{ config.get('roles.worker.runtime', 'jules') | upper }}</div>
-            <div style="font-size: 11.5px; color: var(--text-muted); margin-top: 2px;">Provider: {{ config.get('roles.worker.provider', 'cjules') }}</div>
+          <div class="card" style="margin-bottom: 0; padding: 14px 16px; background-color: var(--color-obsidian); border: 1px solid var(--color-graphite);">
+            <div style="font-size: 11px; color: var(--color-fog); text-transform: uppercase; font-weight: 500; letter-spacing: 0.04em;">Implementer</div>
+            <div style="font-weight: 510; font-size: 14px; color: var(--color-paper); margin-top: 4px; font-family: var(--font-mono);">{{ config.get('roles.worker.runtime', 'jules') | upper }}</div>
+            <div style="font-size: 11.5px; color: var(--color-ash); margin-top: 2px;">Provider: {{ config.get('roles.worker.provider', 'cjules') }}</div>
           </div>
         </div>
 
-        <h3 style="font-size: 15px; font-weight: 600; margin-bottom: 14px;">Workflow & Safety Policies</h3>
-        <table style="width: 100%; border-collapse: collapse; font-size: 13.5px; margin-bottom: 24px;">
-          <tr style="border-bottom: 1px solid var(--border-subtle);">
-            <td style="padding: 10px 0; color: var(--text-secondary);">Pre-execution Critic</td>
-            <td style="padding: 10px 0; font-family: var(--font-mono); text-align: right;">{{ config.get('workflow.pre_critic', 'high_risk') }}</td>
+        <h3 style="font-size: 14px; font-weight: 510; color: var(--color-paper); margin-bottom: 14px;">Workflow &amp; Safety Policies</h3>
+        <table style="width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 24px;">
+          <tr style="border-bottom: 1px solid var(--color-graphite);">
+            <td style="padding: 10px 0; color: var(--color-mist);">Pre-execution Critic</td>
+            <td style="padding: 10px 0; font-family: var(--font-mono); text-align: right; color: var(--color-paper);">{{ config.get('workflow.pre_critic', 'high_risk') }}</td>
           </tr>
-          <tr style="border-bottom: 1px solid var(--border-subtle);">
-            <td style="padding: 10px 0; color: var(--text-secondary);">Post-execution Critic</td>
-            <td style="padding: 10px 0; font-family: var(--font-mono); text-align: right;">{{ config.get('workflow.post_critic', 'high_risk') }}</td>
+          <tr style="border-bottom: 1px solid var(--color-graphite);">
+            <td style="padding: 10px 0; color: var(--color-mist);">Post-execution Critic</td>
+            <td style="padding: 10px 0; font-family: var(--font-mono); text-align: right; color: var(--color-paper);">{{ config.get('workflow.post_critic', 'high_risk') }}</td>
           </tr>
-          <tr style="border-bottom: 1px solid var(--border-subtle);">
-            <td style="padding: 10px 0; color: var(--text-secondary);">Max Automatic Repair Rounds</td>
-            <td style="padding: 10px 0; font-family: var(--font-mono); text-align: right; color: var(--color-pass-text); font-weight: 600;">1 (Hard Bound)</td>
+          <tr style="border-bottom: 1px solid var(--color-graphite);">
+            <td style="padding: 10px 0; color: var(--color-mist);">Max Automatic Repair Rounds</td>
+            <td style="padding: 10px 0; font-family: var(--font-mono); text-align: right; color: var(--color-pulse-green); font-weight: 500;">1 (Hard Bound)</td>
           </tr>
-          <tr style="border-bottom: 1px solid var(--border-subtle);">
-            <td style="padding: 10px 0; color: var(--text-secondary);">Repair Activation Timeout</td>
-            <td style="padding: 10px 0; font-family: var(--font-mono); text-align: right;">{{ config.get('timeouts.repair_activation_seconds', 600) }}s</td>
+          <tr style="border-bottom: 1px solid var(--color-graphite);">
+            <td style="padding: 10px 0; color: var(--color-mist);">Repair Activation Timeout</td>
+            <td style="padding: 10px 0; font-family: var(--font-mono); text-align: right; color: var(--color-paper);">{{ config.get('timeouts.repair_activation_seconds', 600) }}s</td>
           </tr>
-          <tr style="border-bottom: 1px solid var(--border-subtle);">
-            <td style="padding: 10px 0; color: var(--text-secondary);">Repair Fallback</td>
-            <td style="padding: 10px 0; font-family: var(--font-mono); text-align: right;">{{ config.get('workflow.repair_fallback', 'blocked') }}</td>
+          <tr style="border-bottom: 1px solid var(--color-graphite);">
+            <td style="padding: 10px 0; color: var(--color-mist);">Repair Fallback</td>
+            <td style="padding: 10px 0; font-family: var(--font-mono); text-align: right; color: var(--color-paper);">{{ config.get('workflow.repair_fallback', 'blocked') }}</td>
           </tr>
           <tr>
-            <td style="padding: 10px 0; color: var(--text-secondary);">Remote Publish (Push / PR / Merge)</td>
-            <td style="padding: 10px 0; font-family: var(--font-mono); text-align: right; color: var(--color-fail-text);">DISABLED</td>
+            <td style="padding: 10px 0; color: var(--color-mist);">Remote Publish (Push / PR / Merge)</td>
+            <td style="padding: 10px 0; font-family: var(--font-mono); text-align: right; color: var(--color-coral-red);">DISABLED</td>
           </tr>
         </table>
       </div>
@@ -81,12 +81,12 @@
         <form hx-put="/api/config" hx-swap="none" hx-on::after-request="if(event.detail.successful){ alert('Configuration successfully updated and validated!'); } else { alert('Failed to update config: ' + event.detail.xhr.responseText); }">
           <div class="form-group">
             <label class="form-label" for="raw_toml">Edit config.toml</label>
-            <textarea id="raw_toml" name="raw_toml" class="form-textarea" rows="22" style="font-family: var(--font-mono); font-size: 12.5px; line-height: 1.45;">{{ toml_text }}</textarea>
+            <textarea id="raw_toml" name="raw_toml" class="form-textarea" rows="22" style="font-family: var(--font-mono); font-size: 12px; line-height: 1.45; background-color: var(--color-void);">{{ toml_text }}</textarea>
             <div class="form-hint">Edits are validated against core V1 safety invariants before writing to disk.</div>
           </div>
 
           <div style="display: flex; justify-content: flex-end; gap: 10px;">
-            <button type="submit" class="btn btn-primary">Save Configuration</button>
+            <button type="submit" class="btn btn-secondary">Save Configuration</button>
           </div>
         </form>
       </div>

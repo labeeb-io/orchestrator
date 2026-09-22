@@ -3,7 +3,7 @@
 {% block title %}Diagnostics — Labeeb Orchestrator{% endblock %}
 
 {% block header_title %}
-  <h1 class="header-title">System Diagnostics & Preflight</h1>
+  <h1 class="header-title">System Diagnostics &amp; Preflight</h1>
 {% endblock %}
 
 {% block header_actions %}
@@ -17,34 +17,34 @@
 {% endblock %}
 
 {% block content %}
-<div id="doctor-container" style="max-width: 820px; margin: 0 auto;">
+<div id="doctor-container" style="max-width: 840px; margin: 0 auto;">
 
   <div class="card" style="margin-bottom: 24px;">
     <div class="card-header">
       <span class="card-title">Preflight Diagnostic Report</span>
-      <span style="font-family: var(--font-mono); font-size: 11px; color: var(--text-muted);">{{ checks.version }}</span>
+      <span style="font-family: var(--font-mono); font-size: 11px; color: var(--color-fog);">{{ checks.version }}</span>
     </div>
 
-    <div style="display: flex; flex-direction: column; gap: 14px;">
+    <div style="display: flex; flex-direction: column; gap: 10px;">
       <!-- Python Runtime -->
-      <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; background-color: var(--bg-surface-elevated); border-radius: 6px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; background-color: var(--color-obsidian); border: 1px solid var(--color-graphite); border-radius: var(--radius-buttons);">
         <div>
-          <strong style="font-size: 14px;">Python Runtime</strong>
-          <div style="font-family: var(--font-mono); font-size: 12px; color: var(--text-muted); margin-top: 2px;">Python {{ checks.python }}</div>
+          <strong style="font-size: 13.5px; color: var(--color-paper); font-weight: 510;">Python Runtime</strong>
+          <div style="font-family: var(--font-mono); font-size: 12px; color: var(--color-fog); margin-top: 2px;">Python {{ checks.python }}</div>
         </div>
         <span class="badge badge-pass">✓ AVAILABLE</span>
       </div>
 
       <!-- Executables List -->
       {% for name, info in checks.executables.items() %}
-        <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; background-color: var(--bg-surface-elevated); border-radius: 6px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; background-color: var(--color-obsidian); border: 1px solid var(--color-graphite); border-radius: var(--radius-buttons);">
           <div>
-            <strong style="font-size: 14px; text-transform: capitalize;">{{ name }} CLI</strong>
-            <div style="font-family: var(--font-mono); font-size: 12px; color: var(--text-muted); margin-top: 2px;">
+            <strong style="font-size: 13.5px; color: var(--color-paper); font-weight: 510; text-transform: capitalize;">{{ name }} CLI</strong>
+            <div style="font-family: var(--font-mono); font-size: 12px; color: var(--color-fog); margin-top: 2px;">
               {{ info.path }}
             </div>
             {% if info.version %}
-              <div style="font-family: var(--font-mono); font-size: 11px; color: var(--text-secondary); margin-top: 2px;">
+              <div style="font-family: var(--font-mono); font-size: 11px; color: var(--color-mist); margin-top: 2px;">
                 {{ info.version | join(' • ') }}
               </div>
             {% endif %}
@@ -58,10 +58,10 @@
       {% endfor %}
 
       <!-- Critic Setup -->
-      <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; background-color: var(--bg-surface-elevated); border-radius: 6px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; background-color: var(--color-obsidian); border: 1px solid var(--color-graphite); border-radius: var(--radius-buttons);">
         <div>
-          <strong style="font-size: 14px;">Independent Critic Setup</strong>
-          <div style="font-family: var(--font-mono); font-size: 12px; color: var(--text-muted); margin-top: 2px;">
+          <strong style="font-size: 13.5px; color: var(--color-paper); font-weight: 510;">Independent Critic Setup</strong>
+          <div style="font-family: var(--font-mono); font-size: 12px; color: var(--color-fog); margin-top: 2px;">
             Role: {{ checks.critic.role }} (Transport: {{ checks.critic.transport }})
           </div>
         </div>
@@ -73,10 +73,10 @@
       </div>
 
       <!-- State Directory -->
-      <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; background-color: var(--bg-surface-elevated); border-radius: 6px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; background-color: var(--color-obsidian); border: 1px solid var(--color-graphite); border-radius: var(--radius-buttons);">
         <div>
-          <strong style="font-size: 14px;">State Root Storage</strong>
-          <div style="font-family: var(--font-mono); font-size: 12px; color: var(--text-muted); margin-top: 2px;">
+          <strong style="font-size: 13.5px; color: var(--color-paper); font-weight: 510;">State Root Storage</strong>
+          <div style="font-family: var(--font-mono); font-size: 12px; color: var(--color-fog); margin-top: 2px;">
             {{ checks.state_root }}
           </div>
         </div>

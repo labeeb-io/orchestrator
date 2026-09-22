@@ -1,15 +1,17 @@
 {% if goal and goal.phase == 'PLAN_GATE' %}
 <div class="decision-banner" id="decision-banner">
   <div class="decision-info">
-    <h3>⚠ Human Decision Required: Plan Gate</h3>
-    <p>Labeeb has produced an implementation contract and plan. Explicit authorization is required to dispatch Jules.</p>
+    <h3 style="display: flex; align-items: center; gap: 8px;">
+      <span style="color: var(--color-paper);">⚠ Human Decision Required: Plan Gate</span>
+    </h3>
+    <p style="color: var(--color-mist); margin-top: 4px;">Labeeb has produced an implementation contract and plan. Explicit authorization is required to dispatch Jules.</p>
   </div>
   <div style="display: flex; gap: 10px; align-items: center;">
     <button type="button" class="btn btn-primary"
             hx-post="/api/goals/{{ goal.goal_id }}/approve"
             hx-swap="none"
             onclick="this.innerText='Dispatching...'; this.disabled=true;">
-      ✓ Approve Plan &amp; Dispatch Jules
+      Approve Plan &amp; Dispatch Jules
     </button>
     <button type="button" class="btn btn-danger"
             hx-post="/api/goals/{{ goal.goal_id }}/stop"
@@ -20,13 +22,15 @@
   </div>
 </div>
 {% elif goal and goal.phase == 'BLOCKED' %}
-<div class="decision-banner" style="border-color: var(--color-fail-border); background: linear-gradient(135deg, rgba(218, 54, 51, 0.12) 0%, rgba(218, 54, 51, 0.04) 100%);">
+<div class="decision-banner" style="border-color: rgba(235, 87, 87, 0.3); background-color: var(--color-obsidian);">
   <div class="decision-info" style="flex: 1;">
-    <h3 style="color: var(--color-fail-text);">⊘ Automation Stopped: Goal Blocked</h3>
-    <p style="margin-bottom: 8px;">{{ goal.result.reason if goal.result else 'Ambiguous state or safety violation detected.' }}</p>
+    <h3 style="color: var(--color-coral-red); display: flex; align-items: center; gap: 8px;">
+      <span>⊘ Automation Stopped: Goal Blocked</span>
+    </h3>
+    <p style="margin-bottom: 8px; color: var(--color-mist);">{{ goal.result.reason if goal.result else 'Ambiguous state or safety violation detected.' }}</p>
 
     {% if goal.brain_transient_retries is defined and goal.brain_transient_retries > 0 %}
-      <div style="display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; background: rgba(218, 54, 51, 0.08); border: 1px solid var(--color-fail-border); border-radius: 4px; font-size: 12px; color: var(--color-fail-text); margin-top: 4px;">
+      <div style="display: inline-flex; align-items: center; gap: 6px; padding: 3px 8px; background: rgba(235, 87, 87, 0.06); border: 1px solid rgba(235, 87, 87, 0.2); border-radius: var(--radius-badges); font-size: 11px; font-family: var(--font-mono); color: var(--color-coral-red); margin-top: 4px;">
         <span>⟳</span>
         <span>Auto-retry exhausted: {{ goal.brain_transient_retries }}/{{ retry_limit | default(3) }} attempts used</span>
       </div>
@@ -36,12 +40,12 @@
       {% set ev = goal.result.evidence %}
       {% if ev.error %}
         <details style="margin-top: 8px;">
-          <summary style="cursor: pointer; font-size: 12.5px; color: var(--text-muted);">Show raw error details</summary>
+          <summary style="cursor: pointer; font-size: 12px; color: var(--color-fog);">Show raw error details</summary>
           <div class="code-block" style="margin-top: 6px; font-size: 11px; max-height: 200px; overflow-y: auto;">{{ ev.error }}</div>
         </details>
       {% elif ev.lastMessage %}
         <details style="margin-top: 8px;">
-          <summary style="cursor: pointer; font-size: 12.5px; color: var(--text-muted);">Show raw error details</summary>
+          <summary style="cursor: pointer; font-size: 12px; color: var(--color-fog);">Show raw error details</summary>
           <div class="code-block" style="margin-top: 6px; font-size: 11px; max-height: 200px; overflow-y: auto;">{{ ev.lastMessage }}</div>
         </details>
       {% endif %}
@@ -50,17 +54,17 @@
 
   <div style="display: flex; flex-direction: column; gap: 8px; align-items: stretch; min-width: 180px;">
     {% if goal.blocked_action or (goal.pending_action and goal.pending_action.stage == 'AMBIGUOUS') %}
-      <div style="font-size: 11.5px; color: var(--color-fail-text); font-weight: 500; text-align: center; margin-bottom: 2px;">
+      <div style="font-size: 11px; font-family: var(--font-mono); color: var(--color-coral-red); font-weight: 500; text-align: center; margin-bottom: 2px;">
         ⚠ Unresolved write exists
       </div>
-      <button type="button" class="btn btn-primary"
+      <button type="button" class="btn btn-secondary btn-sm"
               hx-post="/api/goals/{{ goal.goal_id }}/reconcile"
               hx-swap="none"
               onclick="this.innerText='Reconciling...'; this.disabled=true;">
         ↻ Reconcile Again
       </button>
     {% else %}
-      <button type="button" class="btn btn-primary"
+      <button type="button" class="btn btn-secondary btn-sm"
               hx-post="/api/goals/{{ goal.goal_id }}/unblock"
               hx-swap="none"
               onclick="this.innerText='Unblocking...'; this.disabled=true;">

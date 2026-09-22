@@ -76,7 +76,7 @@ function addListItem(containerId, placeholder, inputName) {
   row.style.gap = '8px';
   row.style.marginBottom = '8px';
   row.innerHTML = `
-    <input type="text" name="${inputName}" class="form-input" placeholder="${placeholder}" style="flex: 1;" />
+    <input type="text" name="${inputName}" class="form-input" placeholder="${placeholder}" style="flex: 1; font-family: var(--font-mono); font-size: 12.5px;" />
     <button type="button" class="btn btn-secondary btn-sm" onclick="this.parentElement.remove()">×</button>
   `;
   container.appendChild(row);

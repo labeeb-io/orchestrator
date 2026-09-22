@@ -10,39 +10,48 @@
 <div id="goals-container" hx-get="/dashboard" hx-trigger="every 15s, goalUpdated from:body" hx-select="#goals-container" hx-swap="outerHTML">
 
   <!-- Summary Stats Bar -->
-  <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px;">
-    <div class="card" style="margin-bottom: 0; padding: 14px 18px;">
-      <div style="font-size: 12px; color: var(--text-muted); font-weight: 500;">TOTAL GOALS</div>
-      <div style="font-size: 24px; font-weight: 700; margin-top: 4px; font-family: var(--font-mono);">{{ goals | length }}</div>
+  <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 28px;">
+    <div class="card" style="margin-bottom: 0; padding: 16px 20px;">
+      <div style="font-size: 11px; color: var(--color-fog); font-weight: 500; text-transform: uppercase; letter-spacing: 0.04em;">TOTAL GOALS</div>
+      <div style="font-size: 26px; font-weight: 510; margin-top: 4px; font-family: var(--font-mono); color: var(--color-paper);">{{ goals | length }}</div>
     </div>
     
-    <div class="card" style="margin-bottom: 0; padding: 14px 18px; border-left: 3px solid var(--color-active-border);">
-      <div style="font-size: 12px; color: var(--color-active-text); font-weight: 500;">ACTIVE IN-FLIGHT</div>
+    <div class="card" style="margin-bottom: 0; padding: 16px 20px;">
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <div style="font-size: 11px; color: var(--color-fog); font-weight: 500; text-transform: uppercase; letter-spacing: 0.04em;">Active In-Flight</div>
+        <span style="width: 6px; height: 6px; border-radius: 50%; background-color: var(--color-paper); display: inline-block;"></span>
+      </div>
       {% set active_count = goals | selectattr('phase', 'in', ['CREATED', 'THINKING', 'PLAN_GATE', 'EFFECT', 'WAITING_JULES', 'REVIEWING', 'VALIDATING']) | list | length %}
-      <div style="font-size: 24px; font-weight: 700; margin-top: 4px; font-family: var(--font-mono);">{{ active_count }}</div>
+      <div style="font-size: 26px; font-weight: 510; margin-top: 4px; font-family: var(--font-mono); color: var(--color-paper);">{{ active_count }}</div>
     </div>
 
-    <div class="card" style="margin-bottom: 0; padding: 14px 18px; border-left: 3px solid var(--color-pass-border);">
-      <div style="font-size: 12px; color: var(--color-pass-text); font-weight: 500;">PASSED</div>
+    <div class="card" style="margin-bottom: 0; padding: 16px 20px;">
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <div style="font-size: 11px; color: var(--color-fog); font-weight: 500; text-transform: uppercase; letter-spacing: 0.04em;">Passed</div>
+        <span style="width: 6px; height: 6px; border-radius: 50%; background-color: var(--color-pulse-green); display: inline-block;"></span>
+      </div>
       {% set pass_count = goals | selectattr('phase', 'equalto', 'PASS') | list | length %}
-      <div style="font-size: 24px; font-weight: 700; margin-top: 4px; font-family: var(--font-mono);">{{ pass_count }}</div>
+      <div style="font-size: 26px; font-weight: 510; margin-top: 4px; font-family: var(--font-mono); color: var(--color-pulse-green);">{{ pass_count }}</div>
     </div>
 
-    <div class="card" style="margin-bottom: 0; padding: 14px 18px; border-left: 3px solid var(--color-fail-border);">
-      <div style="font-size: 12px; color: var(--color-fail-text); font-weight: 500;">ATTENTION NEEDED</div>
+    <div class="card" style="margin-bottom: 0; padding: 16px 20px;">
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <div style="font-size: 11px; color: var(--color-fog); font-weight: 500; text-transform: uppercase; letter-spacing: 0.04em;">Attention Needed</div>
+        <span style="width: 6px; height: 6px; border-radius: 50%; background-color: var(--color-coral-red); display: inline-block;"></span>
+      </div>
       {% set attention_count = goals | selectattr('phase', 'in', ['BLOCKED', 'FAIL']) | list | length %}
-      <div style="font-size: 24px; font-weight: 700; margin-top: 4px; font-family: var(--font-mono);">{{ attention_count }}</div>
+      <div style="font-size: 26px; font-weight: 510; margin-top: 4px; font-family: var(--font-mono); color: var(--color-coral-red);">{{ attention_count }}</div>
     </div>
   </div>
 
   <!-- Active Goals Section -->
-  <div style="margin-bottom: 32px;">
+  <div style="margin-bottom: 36px;">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
-      <h2 style="font-size: 15px; font-weight: 600; color: var(--text-primary); display: flex; align-items: center; gap: 8px;">
-        <span style="width: 8px; height: 8px; border-radius: 50%; background-color: #58a6ff; display: inline-block;"></span>
-        Active & In-Progress Goals
+      <h2 style="font-size: 13px; font-weight: 510; color: var(--color-paper); letter-spacing: -0.01em; display: flex; align-items: center; gap: 8px;">
+        <span style="width: 6px; height: 6px; border-radius: 50%; background-color: var(--color-paper); display: inline-block;"></span>
+        Active &amp; In-Progress Goals
       </h2>
-      <span style="font-size: 12px; color: var(--text-muted); font-family: var(--font-mono);">Live Auto-Syncing</span>
+      <span style="font-size: 11px; color: var(--color-ash); font-family: var(--font-mono);">Live Auto-Syncing</span>
     </div>
 
     {% set active_goals = goals | selectattr('phase', 'in', ['CREATED', 'THINKING', 'PLAN_GATE', 'EFFECT', 'WAITING_JULES', 'REVIEWING', 'VALIDATING', 'AWAITING_PLAN_APPROVAL', 'AWAITING_USER_FEEDBACK', 'PAUSED']) | list %}
@@ -53,18 +62,20 @@
         {% endfor %}
       </div>
     {% else %}
-      <div class="card" style="text-align: center; padding: 40px 20px; background-color: var(--bg-surface);">
-        <div style="font-size: 32px; margin-bottom: 12px;">☕</div>
-        <h3 style="font-size: 15px; font-weight: 600; margin-bottom: 6px;">No active goals running</h3>
-        <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 16px;">Create a new goal to begin automated multi-agent orchestration.</p>
-        <a href="/goals/new" class="btn btn-primary btn-sm">+ Launch New Goal</a>
+      <div class="card" style="text-align: center; padding: 48px 24px; background-color: var(--color-carbon);">
+        <div style="font-size: 28px; margin-bottom: 12px; opacity: 0.8;">⚡</div>
+        <h3 style="font-size: 14px; font-weight: 510; color: var(--color-paper); margin-bottom: 6px;">No active goals running</h3>
+        <p style="font-size: 13px; color: var(--color-fog); margin-bottom: 20px; max-width: 420px; margin-left: auto; margin-right: auto;">
+          Launch a new AI orchestration goal to begin multi-agent code inspection, planning, and bounded execution.
+        </p>
+        <a href="/goals/new" class="btn btn-primary btn-sm">Launch New AI Goal</a>
       </div>
     {% endif %}
   </div>
 
   <!-- Recent / Completed Goals Section -->
   <div>
-    <h2 style="font-size: 15px; font-weight: 600; color: var(--text-primary); margin-bottom: 14px;">
+    <h2 style="font-size: 13px; font-weight: 510; color: var(--color-paper); letter-spacing: -0.01em; margin-bottom: 14px;">
       Recent Terminal Goals (PASS / FAIL / BLOCKED)
     </h2>
 
@@ -76,7 +87,7 @@
         {% endfor %}
       </div>
     {% else %}
-      <div class="card" style="padding: 24px; color: var(--text-muted); font-size: 13px;">
+      <div class="card" style="padding: 24px; color: var(--color-fog); font-size: 13px; text-align: center;">
         No completed goals recorded in this state directory yet.
       </div>
     {% endif %}

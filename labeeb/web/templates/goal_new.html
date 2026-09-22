@@ -11,7 +11,7 @@
 {% endblock %}
 
 {% block content %}
-<div style="max-width: 780px; margin: 0 auto;">
+<div style="max-width: 800px; margin: 0 auto;">
   <form action="/goals/new" method="POST" class="card" style="padding: 28px;">
     
     <!-- Intent -->
@@ -23,10 +23,10 @@
     </div>
 
     <!-- Workspace & Git Context with Quick Presets -->
-    <div class="form-group" style="margin-bottom: 20px;">
+    <div class="form-group" style="margin-bottom: 22px;">
       <label class="form-label" style="display: flex; justify-content: space-between; align-items: center;">
         <span>Target Project &amp; Workspace</span>
-        <span style="font-size: 11.5px; color: var(--text-muted); font-weight: 400;">Select a preset or enter custom paths</span>
+        <span style="font-size: 11px; color: var(--color-fog); font-weight: 400;">Select a preset or enter custom paths</span>
       </label>
       <div class="preset-btn-group" id="preset-buttons">
         <button type="button" class="preset-btn active" data-preset="labeeb2025" onclick="selectWorkspacePreset('labeeb2025')">
@@ -43,25 +43,25 @@
       <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
         <div class="form-group" style="margin-bottom: 0;">
           <label class="form-label" for="workspace">Local Workspace Path *</label>
-          <input type="text" id="workspace" name="workspace" class="form-input" value="{{ default_workspace }}" onblur="onWorkspacePathChange(this.value)" required />
-          <div id="workspace-status-hint" class="form-hint" style="font-size: 11px;">Inspected: Git repository ready.</div>
+          <input type="text" id="workspace" name="workspace" class="form-input" style="font-family: var(--font-mono); font-size: 12.5px;" value="{{ default_workspace }}" onblur="onWorkspacePathChange(this.value)" required />
+          <div id="workspace-status-hint" class="form-hint" style="font-size: 11px; font-family: var(--font-mono);">Inspected: Git repository ready.</div>
         </div>
 
         <div class="form-group" style="margin-bottom: 0;">
           <label class="form-label" for="repo">GitHub Repository (OWNER/REPO) *</label>
-          <input type="text" id="repo" name="repo" class="form-input" value="{{ default_repo }}" placeholder="e.g. labeeb/backend" required />
+          <input type="text" id="repo" name="repo" class="form-input" style="font-family: var(--font-mono); font-size: 12.5px;" value="{{ default_repo }}" placeholder="e.g. labeeb/backend" required />
           <div class="form-hint" style="font-size: 11px;">Jules repo boundary.</div>
         </div>
       </div>
     </div>
 
-    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px;">
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 22px;">
       <div class="form-group" style="margin-bottom: 0;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
           <label class="form-label" for="branch" style="margin-bottom: 0;">Target Base Branch *</label>
-          <span id="branch-count-badge" style="font-size: 11px; color: var(--text-muted);">{{ branches | length }} branches</span>
+          <span id="branch-count-badge" style="font-size: 11px; color: var(--color-fog); font-family: var(--font-mono);">{{ branches | length }} branches</span>
         </div>
-        <select id="branch" name="branch" class="form-input" style="width: 100%;" required>
+        <select id="branch" name="branch" class="form-select" style="width: 100%; font-family: var(--font-mono); font-size: 12.5px;" required>
           {% for b in branches %}
             <option value="{{ b }}" {% if b == default_branch %}selected{% endif %}>{{ b }}</option>
           {% endfor %}
@@ -71,16 +71,16 @@
 
       <div class="form-group" style="margin-bottom: 0;">
         <label class="form-label" for="deadline_hours">Goal Deadline (Hours)</label>
-        <input type="number" id="deadline_hours" name="deadline_hours" class="form-input" value="12" step="0.5" min="0.5" />
+        <input type="number" id="deadline_hours" name="deadline_hours" class="form-input" style="font-family: var(--font-mono); font-size: 12.5px;" value="12" step="0.5" min="0.5" />
         <div class="form-hint" style="font-size: 11px;">Max budget before timeout.</div>
       </div>
     </div>
 
-    <!-- Redesigned Risk Classification Grid -->
+    <!-- Risk Classification Grid -->
     <div class="form-group">
       <label class="form-label" style="display: flex; justify-content: space-between; align-items: center;">
         <span>Risk Classification &amp; Safety Pipeline</span>
-        <span style="font-size: 11.5px; color: var(--text-muted); font-weight: 400;">Controls independent Claude Critic triggers</span>
+        <span style="font-size: 11px; color: var(--color-fog); font-weight: 400;">Controls independent Claude Critic triggers</span>
       </label>
       
       <div class="risk-grid">
@@ -159,11 +159,11 @@
 
       <!-- Reactive Impact Summary Panel -->
       <div id="risk-impact-panel" class="impact-panel high-risk">
-        <div style="font-weight: 600; margin-bottom: 3px; display: flex; align-items: center; gap: 6px;">
+        <div style="font-weight: 510; margin-bottom: 4px; display: flex; align-items: center; gap: 6px; color: var(--color-paper);">
           <span id="risk-impact-badge">🛡️ High-Assurance Safety Pipeline Active</span>
         </div>
-        <div id="risk-impact-detail">
-          Selected: <strong id="risk-impact-tags">Architecture</strong>. This goal will trigger independent <strong>Claude Critic (Opus)</strong> read-only reviews before plan approval and post-validation. If any critical finding is raised, the goal will pause at a human gate.
+        <div id="risk-impact-detail" style="font-size: 12px; color: var(--color-fog);">
+          Selected: <strong id="risk-impact-tags" style="color: var(--color-mist);">Architecture</strong>. This goal will trigger independent <strong>Claude Critic (Opus)</strong> read-only reviews before plan approval and post-validation. If any critical finding is raised, the goal will pause at a human gate.
         </div>
       </div>
     </div>
@@ -176,7 +176,7 @@
       </div>
       <div id="paths-container">
         <div class="list-item-row" style="display: flex; gap: 8px; margin-bottom: 8px;">
-          <input type="text" name="allowed_paths" class="form-input" placeholder="e.g. api/app" value="src" style="flex: 1;" />
+          <input type="text" name="allowed_paths" class="form-input" placeholder="e.g. api/app" value="src" style="flex: 1; font-family: var(--font-mono); font-size: 12.5px;" />
           <button type="button" class="btn btn-secondary btn-sm" onclick="this.parentElement.remove()">×</button>
         </div>
       </div>
@@ -191,7 +191,7 @@
       </div>
       <div id="validation-container">
         <div class="list-item-row" style="display: flex; gap: 8px; margin-bottom: 8px;">
-          <input type="text" name="validation_commands" class="form-input" placeholder="e.g. php artisan test tests/Feature/SearchTest.php" value="true" style="flex: 1;" required />
+          <input type="text" name="validation_commands" class="form-input" placeholder="e.g. php artisan test tests/Feature/SearchTest.php" value="true" style="flex: 1; font-family: var(--font-mono); font-size: 12.5px;" required />
           <button type="button" class="btn btn-secondary btn-sm" onclick="this.parentElement.remove()">×</button>
         </div>
       </div>
@@ -199,21 +199,21 @@
     </div>
 
     <!-- Authority & Mode Toggles -->
-    <div style="background-color: var(--bg-surface-elevated); padding: 14px 18px; border-radius: 6px; margin-bottom: 24px; border: 1px solid var(--border-subtle);">
-      <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; margin-bottom: 8px;">
-        <input type="checkbox" name="preauthorize_plan" value="true" checked />
-        <span style="font-weight: 500; font-size: 13.5px;">Pre-authorize Bounded Plan</span>
+    <div style="background-color: var(--color-obsidian); padding: 14px 18px; border-radius: var(--radius-buttons); margin-bottom: 24px; border: 1px solid var(--color-graphite);">
+      <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; margin-bottom: 6px;">
+        <input type="checkbox" name="preauthorize_plan" value="true" checked style="accent-color: var(--color-smoke); cursor: pointer;" />
+        <span style="font-weight: 510; font-size: 13px; color: var(--color-paper);">Pre-authorize Bounded Plan</span>
       </label>
-      <div style="font-size: 12px; color: var(--text-muted); margin-left: 24px;">
+      <div style="font-size: 12px; color: var(--color-fog); margin-left: 24px; line-height: 1.4;">
         Automatically dispatches Jules when the generated plan remains strictly within the allowed paths and safety boundaries. Uncheck to pause at PLAN_GATE for manual review.
       </div>
     </div>
 
     <!-- Action Buttons -->
-    <div style="display: flex; justify-content: flex-end; gap: 12px; border-top: 1px solid var(--border-subtle); padding-top: 20px;">
+    <div style="display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid var(--color-graphite); padding-top: 20px;">
       <a href="/dashboard" class="btn btn-secondary">Cancel</a>
       <button type="submit" class="btn btn-primary" style="padding: 9px 24px;">
-        🚀 Launch Orchestration Goal
+        Launch New AI Goal
       </button>
     </div>
 

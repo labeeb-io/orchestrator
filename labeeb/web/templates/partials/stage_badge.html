@@ -1,14 +1,14 @@
 {% set p = phase | default('UNKNOWN') %}
 {% if p == 'PASS' %}
-  <span class="badge badge-pass">✓ PASS</span>
+  <span class="badge badge-pass" style="border-radius: var(--radius-pills); padding: 2px 10px;">✓ PASS</span>
 {% elif p == 'FAIL' %}
-  <span class="badge badge-fail">✕ FAIL</span>
+  <span class="badge badge-fail" style="border-radius: var(--radius-pills); padding: 2px 10px;">✕ FAIL</span>
 {% elif p == 'BLOCKED' %}
-  <span class="badge badge-fail">⊘ BLOCKED</span>
+  <span class="badge badge-fail" style="border-radius: var(--radius-pills); padding: 2px 10px;">⊘ BLOCKED</span>
 {% elif p in ['PLAN_GATE', 'AWAITING_PLAN_APPROVAL', 'AWAITING_USER_FEEDBACK', 'PAUSED'] %}
-  <span class="badge badge-warn">● {{ p }}</span>
+  <span class="badge badge-warn" style="border-radius: var(--radius-pills); padding: 2px 10px;">● {{ p }}</span>
 {% elif p in ['THINKING', 'WAITING_JULES', 'REVIEWING', 'VALIDATING', 'EFFECT'] %}
-  <span class="badge badge-active">● {{ p }}</span>
+  <span class="badge badge-active" style="border-radius: var(--radius-pills); padding: 2px 10px;">● {{ p }}</span>
 {% else %}
-  <span class="badge badge-neutral">○ {{ p }}</span>
+  <span class="badge badge-neutral" style="border-radius: var(--radius-pills); padding: 2px 10px;">○ {{ p }}</span>
 {% endif %}
