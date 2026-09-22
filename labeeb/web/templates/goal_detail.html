@@ -195,79 +195,97 @@
     </div>
 
     <div style="padding: 24px;">
-      <!-- Tab 1: Timeline -->
+      <!-- Tab 1: Interactive Timeline & Milestone Inspector -->
       <div id="tab-timeline" class="tab-pane active">
-        <h3 style="font-size: 14px; font-weight: 510; color: var(--color-paper); margin-bottom: 16px;">Goal Event History</h3>
-        <div style="display: flex; flex-direction: column; gap: 8px;">
-          {% if timeline_events %}
-            {% for ev in timeline_events %}
-              <div style="display: flex; gap: 14px; align-items: flex-start; padding: 12px 14px; background-color: var(--color-obsidian); border: 1px solid var(--color-graphite); border-radius: var(--radius-buttons);">
-                <div style="font-family: var(--font-mono); font-size: 11.5px; color: var(--color-fog); min-width: 75px;">
-                  {{ ev.timestamp[11:19] if ev.timestamp else '00:00:00' }}
-                </div>
-                <div style="flex: 1; min-width: 0; overflow: hidden;">
-                  <div style="display: flex; align-items: center; gap: 8px;">
-                    <span class="badge {% if 'blocked' in ev.event_type or 'fail' in ev.event_type %}badge-fail{% elif 'pass' in ev.event_type %}badge-pass{% elif 'retry' in ev.event_type or 'warn' in ev.event_type %}badge-warn{% else %}badge-active{% endif %}" style="font-size: 10.5px;">
-                      {{ ev.event_type }}
-                    </span>
-                  </div>
-                  {% if ev.data %}
-                    <div style="color: var(--color-mist); font-size: 12.5px; margin-top: 5px; font-family: var(--font-mono); word-break: break-word; overflow-wrap: anywhere; line-height: 1.5;">
-                      {% if ev.data.reason %}
-                        <div><strong style="color: var(--color-paper);">Reason:</strong> {{ ev.data.reason }}</div>
-                      {% elif ev.data.plan and ev.data.plan.plan_summary %}
-                        <div style="margin-top: 2px;">
-                          <strong style="color: var(--color-paper);">Plan Summary:</strong> {{ ev.data.plan.plan_summary }}
-                        </div>
-                        {% if ev.data.planning_decision and ev.data.planning_decision.reason %}
-                          <div style="margin-top: 4px; color: var(--color-fog); font-size: 11.5px;">
-                            {{ ev.data.planning_decision.reason }}
-                          </div>
-                        {% endif %}
-                      {% elif ev.data.error %}
-                        <div style="color: var(--color-coral-red);"><strong style="color: var(--color-coral-red);">Error:</strong> {{ ev.data.error }}</div>
-                      {% elif ev.data.marker %}
-                        <div><strong style="color: var(--color-fog);">Marker:</strong> {{ ev.data.marker }}</div>
-                      {% elif ev.data.phase %}
-                        <div><strong style="color: var(--color-fog);">Phase:</strong> {{ ev.data.phase }}</div>
-                      {% elif ev.data.target_phase %}
-                        <div><strong style="color: var(--color-fog);">Target Phase:</strong> {{ ev.data.target_phase }}</div>
-                      {% elif ev.data.session_id %}
-                        <div><strong style="color: var(--color-fog);">Session ID:</strong> {{ ev.data.session_id }}</div>
-                      {% elif ev.data.decision %}
-                        <div><strong style="color: var(--color-paper);">Decision:</strong> {{ ev.data.decision.action if ev.data.decision.action is defined else ev.data.decision }}</div>
-                        {% if ev.data.decision.reason %}<div style="color: var(--color-fog); font-size: 11.5px;">{{ ev.data.decision.reason }}</div>{% endif %}
-                      {% else %}
-                        <details style="margin-top: 4px;">
-                          <summary style="cursor: pointer; color: var(--color-fog); font-size: 11.5px;">View payload details</summary>
-                          <pre class="code-block" style="margin-top: 6px; padding: 8px; font-size: 11px; max-height: 180px; overflow-y: auto;">{{ ev.data | pretty_json }}</pre>
-                        </details>
-                      {% endif %}
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 8px;">
+          <div>
+            <h3 style="font-size: 14px; font-weight: 510; color: var(--color-paper); margin: 0;">Goal Event History</h3>
+            <div style="font-size: 12px; color: var(--color-fog); margin-top: 3px;">
+              Interactive chronological execution trail. Click any milestone to inspect parameters, diffs, and brain evaluations.
+            </div>
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span class="badge badge-active" style="font-size: 11px;">
+              <span class="material-symbols-outlined" style="font-size: 13px; vertical-align: middle; margin-right: 2px;">timeline</span>
+              {{ enriched_events|length if enriched_events else timeline_events|length }} Milestones
+            </span>
+          </div>
+        </div>
+
+        <div class="timeline-master-detail">
+          <!-- Left Column: Chronological Event Stream -->
+          <div class="timeline-stream" id="timeline-stream-list">
+            {% if enriched_events %}
+              {% for ev in enriched_events %}
+                <div class="timeline-event-card {% if loop.last %}selected{% endif %}" 
+                     id="card-{{ ev.id }}" 
+                     data-event-id="{{ ev.id }}"
+                     onclick="selectTimelineEvent('{{ ev.id }}')">
+                  <div class="event-card-header">
+                    <div class="event-card-icon {{ ev.icon_class or '' }}">
+                      <span class="material-symbols-outlined">{{ ev.icon }}</span>
                     </div>
-                  {% endif %}
+                    <div class="event-card-meta">
+                      <div class="event-card-time">{{ ev.time_str }}</div>
+                      <div class="event-card-elapsed">{{ ev.elapsed_str }}</div>
+                    </div>
+                    <span class="badge {{ ev.badge_class }} event-card-badge">{{ ev.badge }}</span>
+                  </div>
+                  <div class="event-card-title">{{ ev.title }}</div>
+                  <div class="event-card-summary">{{ ev.summary }}</div>
                 </div>
+              {% endfor %}
+            {% else %}
+              <div class="card" style="text-align: center; padding: 24px; color: var(--color-fog);">
+                No events recorded yet.
               </div>
-            {% endfor %}
-          {% else %}
-            <div style="display: flex; gap: 14px; align-items: flex-start; padding: 12px 14px; background-color: var(--color-obsidian); border: 1px solid var(--color-graphite); border-radius: var(--radius-buttons);">
-              <div style="font-family: var(--font-mono); font-size: 11.5px; color: var(--color-fog); min-width: 75px;">
-                {{ goal.created_at[11:19] if goal.created_at else '00:00:00' }}
-              </div>
-              <div style="flex: 1;">
-                <strong style="color: var(--color-paper);">Goal Created</strong>
-                <div style="color: var(--color-mist); font-size: 12.5px; margin-top: 2px;">
-                  Initial immutable contract snapshot initialized.
+            {% endif %}
+          </div>
+
+          <!-- Right Column: Interactive Event Inspector Viewport -->
+          <div class="timeline-inspector">
+            <div class="card event-inspector-card" id="event-inspector-card">
+              <div id="inspector-content">
+                <!-- Dynamically populated by selectTimelineEvent() -->
+                <div style="display: flex; align-items: center; justify-content: center; height: 320px; color: var(--color-fog); flex-direction: column; gap: 8px;">
+                  <span class="material-symbols-outlined" style="font-size: 32px; opacity: 0.5;">info</span>
+                  <span style="font-size: 13px;">Select any event on the left to inspect its detailed parameters and logs.</span>
                 </div>
               </div>
             </div>
-          {% endif %}
+          </div>
         </div>
+
+        <!-- Hidden JSON Data Island for instantaneous zero-latency client inspection -->
+        <script id="enriched-events-data" type="application/json">
+          {{ enriched_events_json | safe }}
+        </script>
       </div>
 
       <!-- Tab 2: Plan & Contract -->
       <div id="tab-plan" class="tab-pane">
         <h3 style="font-size: 14px; font-weight: 510; color: var(--color-paper); margin-bottom: 12px;">Goal Contract</h3>
         {% if goal.contract %}
+          {% set gc = goal.contract.goal_contract if (goal.contract.goal_contract is defined and goal.contract.goal_contract) else goal.contract %}
+          {% if gc.observable_outcome %}
+            <div class="card" style="background-color: var(--color-obsidian); border-left: 3px solid #06b6d4; margin-bottom: 16px;">
+              <div style="font-size: 11px; color: var(--color-fog); text-transform: uppercase; font-weight: 500; letter-spacing: 0.04em; margin-bottom: 6px;">Observable Outcome</div>
+              <div style="font-size: 13.5px; color: #ffffff; font-weight: 500; line-height: 1.5;">{{ gc.observable_outcome }}</div>
+            </div>
+          {% endif %}
+          {% if gc.acceptance_criteria %}
+            <div class="card" style="background-color: var(--color-obsidian); margin-bottom: 16px;">
+              <div style="font-size: 11px; color: var(--color-fog); text-transform: uppercase; font-weight: 500; letter-spacing: 0.04em; margin-bottom: 8px;">Acceptance Criteria Checklist</div>
+              <div style="display: flex; flex-direction: column; gap: 6px;">
+                {% for ac in gc.acceptance_criteria %}
+                  <div style="display: flex; align-items: flex-start; gap: 8px; font-size: 13px; color: var(--color-paper);">
+                    <span class="material-symbols-outlined" style="font-size: 16px; color: var(--color-signal-mint); flex-shrink: 0; margin-top: 1px;">check_circle</span>
+                    <span>{{ ac }}</span>
+                  </div>
+                {% endfor %}
+              </div>
+            </div>
+          {% endif %}
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 20px;">
             <div>
               <div style="font-size: 11px; color: var(--color-fog); text-transform: uppercase; font-weight: 500; letter-spacing: 0.04em;">Allowed Paths</div>
