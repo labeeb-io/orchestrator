@@ -18,21 +18,16 @@ from labeeb.core.artifacts import (
     SECOND_AUDIT,
     SOLUTION_CANDIDATES,
     GoalArtifactStore,
-    compute_cascading_invalidation,
 )
 from labeeb.core.controller import LabeebController
 from labeeb.errors import ControllerError
 from labeeb.models import (
-    ArtifactMeta,
     ArtifactStatus,
     ArtifactValidity,
-    GoalArtifactIndexEntry,
 )
 from labeeb.storage.goal_store import (
     GoalPaths,
     GoalStore,
-    migrate_state_v1_to_v2,
-    read_ref_json,
 )
 
 
@@ -283,4 +278,4 @@ def test_labeeb_controller_artifact_store_integration(temp_goal_dir):
     assert "artifacts" in state
     assert state["artifacts"] == {}
     assert state["macro_phase"] == "THINKING"
-    assert state["current_activity"] == "goal_contract"
+    assert state["current_activity"] == "authority_context"

@@ -185,7 +185,7 @@ class LabeebController:
             "plan_ref": None,
             "phase": "CREATED",
             "macro_phase": "THINKING",
-            "current_activity": "goal_contract",
+            "current_activity": "authority_context",
             "artifacts": {},
             "execution_rounds": 0,
             "proof_path_locked": False,
@@ -374,11 +374,24 @@ class LabeebController:
     ) -> dict[str, Any]:
         return decisions.perform_critic(self, when, contract, plan, evidence)
 
-    def approve_plan_if_authorized(self, state: dict[str, Any]) -> None:
-        decisions.approve_plan_if_authorized(self, state)
+    def approve_plan_if_authorized(self, state: dict[str, Any], *, manual_approval: bool = False) -> None:
+        decisions.approve_plan_if_authorized(self, state, manual_approval=manual_approval)
 
     def dispatch_jules(self, state: dict[str, Any]) -> None:
         decisions.dispatch_jules(self, state)
+
+    def complete_baseline_shortcut(self, state: dict[str, Any], decision: dict[str, Any]) -> None:
+        """Finish a goal already proven by its original baseline without dispatching Jules."""
+        evidence = {
+            "status": "PASS",
+            "terminal_path": "BASELINE_SHORTCUT",
+            "baseline_artifact": (state.get("artifacts") or {}).get("baseline_result"),
+            "reason": decision.get("reason"),
+        }
+        state["macro_phase"] = "REPORTING"
+        state["baseline_shortcut"] = True
+        self.record_event("baseline.shortcut_pass", evidence)
+        self.pass_goal(state, decision, evidence)
 
     def handle_review_decision(self, state: dict[str, Any], decision: dict[str, Any]) -> None:
         decisions.handle_review_decision(self, state, decision)
@@ -580,7 +593,7 @@ class LabeebController:
             state = self.store.load()
             if state["phase"] != "PLAN_GATE":
                 raise ControllerError(f"Goal is not waiting at PLAN_GATE (phase={state['phase']})")
-            self.dispatch_jules(state)
+            self.approve_plan_if_authorized(state, manual_approval=True)
 
     def status(self) -> dict[str, Any]:
         state = self.store.load()

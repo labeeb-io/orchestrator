@@ -8,24 +8,15 @@ import pytest
 from labeeb.config import Config
 from labeeb.core.artifacts import (
     AUTHORITY_CONTEXT,
-    BASELINE_RESULT,
-    DELIVERY_REVIEW,
-    EXECUTION_CONTRACT,
     GOAL_CONTRACT,
-    MUTATION_PREFLIGHT,
-    PRODUCT_CONTRACT,
     PROOF_CONTRACT,
     REALITY_AUDIT,
-    SECOND_AUDIT,
     SOLUTION_CANDIDATES,
-    GoalArtifactStore,
 )
 from labeeb.core.controller import LabeebController
 from labeeb.core.convergence import ReasoningProgressTracker
 from labeeb.core.decisions import handle_reasoning_decision
 from labeeb.core.state_machine import (
-    ALLOWED_ACTIVITY_TRANSITIONS,
-    activity_brain_prompt,
     compile_authority_context,
     evaluate_mutation_preflight,
     parse_reasoning_decision,
@@ -40,9 +31,7 @@ from labeeb.models import (
     ArtifactValidity,
     PathIntegrityStatus,
     ReasoningActivity,
-    ReasoningDecisionAction,
 )
-from labeeb.storage.goal_store import GoalPaths, GoalStore
 
 
 @pytest.fixture

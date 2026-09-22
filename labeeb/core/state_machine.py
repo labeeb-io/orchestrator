@@ -26,47 +26,7 @@ def initial_brain_prompt(contract_seed: dict[str, Any], config: Config) -> str:
     custom = config.get("prompts.brain_initial", "")
     if custom:
         return str(custom).format(contract_json=format_json_for_prompt(contract_seed))
-    return textwrap.dedent(
-        f"""
-        You are the Labeeb engineering decision brain. Work READ-ONLY in the repository during this turn.
-        If the labeeb-orchestrator skill is available, use it. Do not implement, commit, push, create PRs, merge, or mutate production.
-
-        Compile the user's intent into a bounded Goal Contract, inspect current repository reality, deliberately reuse existing mechanisms, evaluate alternatives, perform a second audit, and converge on a worker-ready plan.
-
-        Initial immutable request:
-        {format_json_for_prompt(contract_seed)}
-
-        Return exactly one structured envelope:
-        {DECISION_START}
-        {{
-          "action": "PLAN_READY" | "BLOCKED",
-          "reason": "...",
-          "goal_contract": {{
-            "observable_outcome": "...",
-            "current_behavior": "...",
-            "expected_behavior": "...",
-            "constraints": ["..."],
-            "acceptance_criteria": ["..."],
-            "non_goals": ["..."],
-            "must_not_change": ["..."],
-            "required_evidence": ["..."],
-            "material_unknowns": ["..."]
-          }},
-          "execution": {{
-            "jules_prompt": "bounded execution contract",
-            "validation_commands": ["deterministic command"],
-            "allowed_paths": ["path/or/prefix"],
-            "risk_tags": ["architecture|concurrency|persistence|security|public_contract|large_blast_radius|other"],
-            "needs_pre_critic": false,
-            "needs_post_critic": false
-          }},
-          "plan_summary": "..."
-        }}
-        {DECISION_END}
-
-        Do not add prose outside the envelope.
-        """
-    ).strip()
+    return activity_brain_prompt(ReasoningActivity.AUTHORITY_CONTEXT, contract_seed, {}, config)
 
 
 def convergence_prompt(contract: dict[str, Any], plan: dict[str, Any], critique: dict[str, Any]) -> str:
@@ -444,6 +404,14 @@ def activity_brain_prompt(
     config: Config,
 ) -> str:
     """Generate concise activity prompt referencing skill semantics."""
+    artifact_type = {
+        ReasoningActivity.PRODUCT_VALIDATION: "product_contract",
+        ReasoningActivity.BASELINE: "baseline_result",
+        ReasoningActivity.SOLUTION_EXPLORATION: "solution_candidates",
+        ReasoningActivity.SECOND_REALITY_AUDIT: "second_audit",
+        ReasoningActivity.DELIVERY_READINESS: "delivery_review",
+        ReasoningActivity.INDEPENDENT_CRITIQUE: "critic_review",
+    }.get(activity_name, activity_name)
     skill_guidance = {
         ReasoningActivity.AUTHORITY_CONTEXT: "Apply the semantics of /labeeb-engineering-goal (authority bootstrap).",
         ReasoningActivity.GOAL_CONTRACT: "Apply the semantics of /labeeb-orchestrator (Goal Contract compilation).",
@@ -451,7 +419,7 @@ def activity_brain_prompt(
         ReasoningActivity.PROOF_CONTRACT: "Apply the semantics of /labeeb-engineering-goal (supported entrypoint, completion probe, observable checkpoints).",
         ReasoningActivity.REALITY_AUDIT: "Apply the semantics of /labeeb-orchestrator (inspect repository reality, deliberate reuse search).",
         ReasoningActivity.MUTATION_PREFLIGHT: "Apply the semantics of /labeeb-engineering-goal (mutation preflight: bounds, limits, fan-out, cohort).",
-        ReasoningActivity.BASELINE: "Apply the semantics of /labeeb-engineering-goal (exercise entrypoint before code changes; stop at first broken boundary). If baseline passes completely, output action PASS.",
+        ReasoningActivity.BASELINE: "Apply the semantics of /labeeb-engineering-goal (exercise entrypoint before code changes; stop at first broken boundary). If baseline passes completely, output action PASS and data.status=PASS.",
         ReasoningActivity.DIAGNOSIS: "Apply the semantics of /labeeb-engineering-goal (diagnose first broken boundary; root cause evidence).",
         ReasoningActivity.SOLUTION_EXPLORATION: "Apply the semantics of /labeeb-orchestrator (evaluate meaningful alternatives, prioritize reuse and minimal scope).",
         ReasoningActivity.SECOND_REALITY_AUDIT: "Apply the semantics of /labeeb-orchestrator (actively attempt to disprove preferred solution; check hidden coupling and secondary callers).",
@@ -485,7 +453,7 @@ def activity_brain_prompt(
           "next_activity": "next activity name or null",
           "reason": "summary of findings and rationale",
           "produced_artifact": {{
-            "artifact_type": "{activity_name}",
+            "artifact_type": "{artifact_type}",
             "data": {{}}
           }},
           "invalidate_roots": ["artifact_type_to_invalidate_if_assumption_disproved"],

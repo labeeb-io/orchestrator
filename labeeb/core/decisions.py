@@ -8,12 +8,22 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from labeeb.config import critic_needed
+from labeeb.core.artifacts import (
+    BASELINE_RESULT,
+    CRITIC_REVIEW,
+    DELIVERY_REVIEW,
+    PRODUCT_CONTRACT,
+    SECOND_AUDIT,
+    SOLUTION_CANDIDATES,
+)
 from labeeb.core.convergence import ReasoningProgressTracker
+from labeeb.core.readiness import baseline_passed, evaluate_implementation_readiness
 from labeeb.core.state_machine import (
     activity_brain_prompt,
     convergence_prompt,
     critic_prompt,
     event_brain_prompt,
+    update_proof_path_lock,
     validate_activity_transition,
 )
 from labeeb.errors import ControllerError
@@ -37,6 +47,16 @@ if TYPE_CHECKING:
     from labeeb.core.controller import LabeebController
 
 
+ACTIVITY_ARTIFACT_TYPES = {
+    ReasoningActivity.PRODUCT_VALIDATION: PRODUCT_CONTRACT,
+    ReasoningActivity.BASELINE: BASELINE_RESULT,
+    ReasoningActivity.SOLUTION_EXPLORATION: SOLUTION_CANDIDATES,
+    ReasoningActivity.SECOND_REALITY_AUDIT: SECOND_AUDIT,
+    ReasoningActivity.DELIVERY_READINESS: DELIVERY_REVIEW,
+    ReasoningActivity.INDEPENDENT_CRITIQUE: CRITIC_REVIEW,
+}
+
+
 def handle_reasoning_decision(ctl: LabeebController, state: dict[str, Any], decision: dict[str, Any]) -> None:
     """Process structured reasoning activity decision envelope."""
     action = str(decision.get("decision") or decision.get("action") or "").strip()
@@ -53,6 +73,7 @@ def handle_reasoning_decision(ctl: LabeebController, state: dict[str, Any], deci
     current_activity = str(
         decision.get("current_activity") or state.get("current_activity") or ReasoningActivity.GOAL_CONTRACT
     )
+    state["reasoning_graph_active"] = True
     activity_status = str(decision.get("activity_status") or ArtifactStatus.SATISFIED)
     not_applicable_reason = decision.get("not_applicable_reason")
     next_activity = decision.get("next_activity")
@@ -75,18 +96,27 @@ def handle_reasoning_decision(ctl: LabeebController, state: dict[str, Any], deci
     # Persist produced artifact if present
     produced_art_type: str | None = None
     if produced and isinstance(produced, dict):
-        produced_art_type = produced.get("artifact_type") or current_activity
-        art_data = produced.get("data") or {}
-        ctl.artifact_store.write_artifact(
-            state=state,
-            artifact_type=produced_art_type,
-            data=art_data,
-            producer=str(ctl.config.get("workflow.brain_role", "brain")),
-            evidence_refs=evidence_refs,
-            activity_status=activity_status,
-            not_applicable_reason=not_applicable_reason,
-            allow_stale_dependency=False,
+        requested_type = produced.get("artifact_type")
+        produced_art_type = (
+            ACTIVITY_ARTIFACT_TYPES.get(current_activity, current_activity)
+            if requested_type in {None, current_activity}
+            else requested_type
         )
+        art_data = produced.get("data") or {}
+        try:
+            ctl.artifact_store.write_artifact(
+                state=state,
+                artifact_type=produced_art_type,
+                data=art_data,
+                producer=str(ctl.config.get("workflow.brain_role", "brain")),
+                evidence_refs=evidence_refs,
+                activity_status=activity_status,
+                not_applicable_reason=not_applicable_reason,
+                allow_stale_dependency=False,
+            )
+        except ControllerError as exc:
+            ctl.block(state, str(exc), evidence=decision)
+            return
 
     # Invalidate requested roots and cascading downstream artifacts (excluding the artifact just produced)
     if invalidate_roots:
@@ -131,6 +161,13 @@ def handle_reasoning_decision(ctl: LabeebController, state: dict[str, Any], deci
             "next": next_activity,
         },
     )
+
+    if action == ReasoningDecisionAction.PASS:
+        if not baseline_passed(decision):
+            ctl.block(state, "Only a passing baseline may terminate a reasoning goal", evidence=decision)
+            return
+        ctl.complete_baseline_shortcut(state, decision)
+        return
 
     if action == ReasoningDecisionAction.IMPLEMENTATION_READY:
         handle_implementation_readiness_request(ctl, state, decision)
@@ -327,12 +364,63 @@ def perform_critic(
     return critique
 
 
-def approve_plan_if_authorized(ctl: LabeebController, state: dict[str, Any]) -> None:
-    """Auto-dispatch Jules if the contract preauthorizes bounded execution."""
+def approve_plan_if_authorized(
+    ctl: LabeebController, state: dict[str, Any], *, manual_approval: bool = False
+) -> None:
+    """Dispatch only after V2 readiness and authority checks, or retain legacy V1 behavior."""
     contract = read_ref_json(state["contract_ref"])
     preapproved = bool(contract.get("authority", {}).get("preauthorize_bounded_plan"))
-    if not preapproved:
+    if not state.get("reasoning_graph_active"):
+        if preapproved or manual_approval:
+            ctl.dispatch_jules(state)
         return
+
+    plan = read_ref_json(state["plan_ref"])
+    readiness = evaluate_implementation_readiness(
+        state,
+        contract,
+        plan,
+        max_execution_rounds=int(ctl.config.get("planning.max_execution_rounds", 2)),
+        require_proof_path_locked=False,
+    )
+    if readiness["ready"] and not state.get("proof_path_locked"):
+        update_proof_path_lock(state, {}, is_state_changing=True)
+        readiness = evaluate_implementation_readiness(
+            state,
+            contract,
+            plan,
+            max_execution_rounds=int(ctl.config.get("planning.max_execution_rounds", 2)),
+        )
+    state["implementation_readiness"] = readiness
+    state["change_authority"] = readiness["authority"]
+    if not readiness["ready"]:
+        state["phase"] = "PLAN_GATE"
+        ctl.store.save(state)
+        ctl.record_event("readiness.blocked", readiness)
+        return
+
+    authority = readiness["authority"]
+    if authority in {"PRODUCTION", "INCIDENTAL"}:
+        ctl.block(state, f"Change authority blocks autonomous execution: {authority}", evidence=readiness)
+        return
+    if authority == "GATED" and not manual_approval:
+        state["phase"] = "PLAN_GATE"
+        state["human_checkpoint"] = {
+            "needed": True,
+            "boundary_type": "change_authority",
+            "question": "Approve the bounded gated implementation plan?",
+        }
+        ctl.store.save(state)
+        ctl.record_event("readiness.human_gate", readiness)
+        return
+    if not preapproved and not manual_approval:
+        state["phase"] = "PLAN_GATE"
+        ctl.store.save(state)
+        ctl.record_event("readiness.awaiting_approval", readiness)
+        return
+
+    state["macro_phase"] = "EXECUTE"
+    state["current_activity"] = ReasoningActivity.EXECUTION_CONTRACT
     ctl.dispatch_jules(state)
 
 
