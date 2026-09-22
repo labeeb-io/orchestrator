@@ -30,13 +30,16 @@
       </label>
       <div class="preset-btn-group" id="preset-buttons">
         <button type="button" class="preset-btn active" data-preset="labeeb2025" onclick="selectWorkspacePreset('labeeb2025')">
-          <span>🌟</span> labeeb2025 (Core Platform)
+          <span class="material-symbols-outlined" style="font-size: 15px;">stars</span>
+          <span>labeeb2025 (Core Platform)</span>
         </button>
         <button type="button" class="preset-btn" data-preset="labeeb-orchestrator" onclick="selectWorkspacePreset('labeeb-orchestrator')">
-          <span>⚙️</span> labeeb-orchestrator (Control Plane)
+          <span class="material-symbols-outlined" style="font-size: 15px;">tune</span>
+          <span>labeeb-orchestrator (Control Plane)</span>
         </button>
         <button type="button" class="preset-btn" data-preset="custom" onclick="selectWorkspacePreset('custom')">
-          <span>✏️</span> Custom Directory...
+          <span class="material-symbols-outlined" style="font-size: 15px;">edit_note</span>
+          <span>Custom Directory...</span>
         </button>
       </div>
 
@@ -89,8 +92,14 @@
           <input type="checkbox" name="risk_tags" value="architecture" checked onchange="updateRiskImpact(this)">
           <div class="risk-card-content">
             <div class="risk-card-header">
-              <span class="risk-card-title">🏛️ Architecture</span>
-              <span class="risk-tooltip-icon">ℹ️<span class="tooltip-text">Changes touching system boundaries, core state machines, or foundational orchestration patterns.</span></span>
+              <span class="risk-card-title">
+                <span class="material-symbols-outlined" style="font-size: 18px; color: var(--color-fog);">account_tree</span>
+                <span>Architecture</span>
+              </span>
+              <span class="risk-tooltip-icon">
+                <span class="material-symbols-outlined" style="font-size: 14px;">info</span>
+                <span class="tooltip-text">Changes touching system boundaries, core state machines, or foundational orchestration patterns.</span>
+              </span>
             </div>
             <div class="risk-card-desc">Core patterns, pipelines &amp; component boundaries</div>
           </div>
@@ -101,8 +110,14 @@
           <input type="checkbox" name="risk_tags" value="security" onchange="updateRiskImpact(this)">
           <div class="risk-card-content">
             <div class="risk-card-header">
-              <span class="risk-card-title">🛡️ Security &amp; Auth</span>
-              <span class="risk-tooltip-icon">ℹ️<span class="tooltip-text">Changes involving authentication, credentials, session management, tokens, or network perimeter.</span></span>
+              <span class="risk-card-title">
+                <span class="material-symbols-outlined" style="font-size: 18px; color: var(--color-fog);">shield</span>
+                <span>Security &amp; Auth</span>
+              </span>
+              <span class="risk-tooltip-icon">
+                <span class="material-symbols-outlined" style="font-size: 14px;">info</span>
+                <span class="tooltip-text">Changes involving authentication, credentials, session management, tokens, or network perimeter.</span>
+              </span>
             </div>
             <div class="risk-card-desc">Credentials, access control &amp; trust perimeter</div>
           </div>
@@ -113,8 +128,14 @@
           <input type="checkbox" name="risk_tags" value="persistence" onchange="updateRiskImpact(this)">
           <div class="risk-card-content">
             <div class="risk-card-header">
-              <span class="risk-card-title">💾 Database &amp; Store</span>
-              <span class="risk-tooltip-icon">ℹ️<span class="tooltip-text">Changes to database schemas, migrations, durable file storage, serialization, or data models.</span></span>
+              <span class="risk-card-title">
+                <span class="material-symbols-outlined" style="font-size: 18px; color: var(--color-fog);">database</span>
+                <span>Database &amp; Store</span>
+              </span>
+              <span class="risk-tooltip-icon">
+                <span class="material-symbols-outlined" style="font-size: 14px;">info</span>
+                <span class="tooltip-text">Changes to database schemas, migrations, durable file storage, serialization, or data models.</span>
+              </span>
             </div>
             <div class="risk-card-desc">Schemas, migrations, state serialization &amp; disk store</div>
           </div>
@@ -125,8 +146,14 @@
           <input type="checkbox" name="risk_tags" value="concurrency" onchange="updateRiskImpact(this)">
           <div class="risk-card-content">
             <div class="risk-card-header">
-              <span class="risk-card-title">⚡ Concurrency</span>
-              <span class="risk-tooltip-icon">ℹ️<span class="tooltip-text">Asynchronous event loops, worker threads, queue semantics, locking, or race condition surfaces.</span></span>
+              <span class="risk-card-title">
+                <span class="material-symbols-outlined" style="font-size: 18px; color: var(--color-fog);">bolt</span>
+                <span>Concurrency</span>
+              </span>
+              <span class="risk-tooltip-icon">
+                <span class="material-symbols-outlined" style="font-size: 14px;">info</span>
+                <span class="tooltip-text">Asynchronous event loops, worker threads, queue semantics, locking, or race condition surfaces.</span>
+              </span>
             </div>
             <div class="risk-card-desc">Background workers, locks, async queues &amp; timing</div>
           </div>
@@ -137,8 +164,14 @@
           <input type="checkbox" name="risk_tags" value="public_contract" onchange="updateRiskImpact(this)">
           <div class="risk-card-content">
             <div class="risk-card-header">
-              <span class="risk-card-title">🔌 Public API</span>
-              <span class="risk-tooltip-icon">ℹ️<span class="tooltip-text">Public HTTP REST endpoints, CLI parameters, client contracts, or breaking schema changes.</span></span>
+              <span class="risk-card-title">
+                <span class="material-symbols-outlined" style="font-size: 18px; color: var(--color-fog);">api</span>
+                <span>Public API</span>
+              </span>
+              <span class="risk-tooltip-icon">
+                <span class="material-symbols-outlined" style="font-size: 14px;">info</span>
+                <span class="tooltip-text">Public HTTP REST endpoints, CLI parameters, client contracts, or breaking schema changes.</span>
+              </span>
             </div>
             <div class="risk-card-desc">REST routes, CLI flags &amp; external integration contracts</div>
           </div>
@@ -149,8 +182,14 @@
           <input type="checkbox" name="risk_tags" value="large_blast_radius" onchange="updateRiskImpact(this)">
           <div class="risk-card-content">
             <div class="risk-card-header">
-              <span class="risk-card-title">💥 High Blast Radius</span>
-              <span class="risk-tooltip-icon">ℹ️<span class="tooltip-text">Edits impacting multiple subsystems, core shared utilities, or widespread dependencies.</span></span>
+              <span class="risk-card-title">
+                <span class="material-symbols-outlined" style="font-size: 18px; color: var(--color-fog);">warning</span>
+                <span>High Blast Radius</span>
+              </span>
+              <span class="risk-tooltip-icon">
+                <span class="material-symbols-outlined" style="font-size: 14px;">info</span>
+                <span class="tooltip-text">Edits impacting multiple subsystems, core shared utilities, or widespread dependencies.</span>
+              </span>
             </div>
             <div class="risk-card-desc">Cross-subsystem refactors &amp; shared utilities</div>
           </div>
@@ -160,7 +199,8 @@
       <!-- Reactive Impact Summary Panel -->
       <div id="risk-impact-panel" class="impact-panel high-risk">
         <div style="font-weight: 510; margin-bottom: 4px; display: flex; align-items: center; gap: 6px; color: var(--color-paper);">
-          <span id="risk-impact-badge">🛡️ High-Assurance Safety Pipeline Active</span>
+          <span class="material-symbols-outlined" style="font-size: 16px; color: var(--color-pulse-green);">shield</span>
+          <span id="risk-impact-badge">High-Assurance Safety Pipeline Active</span>
         </div>
         <div id="risk-impact-detail" style="font-size: 12px; color: var(--color-fog);">
           Selected: <strong id="risk-impact-tags" style="color: var(--color-mist);">Architecture</strong>. This goal will trigger independent <strong>Claude Critic (Opus)</strong> read-only reviews before plan approval and post-validation. If any critical finding is raised, the goal will pause at a human gate.
@@ -172,12 +212,17 @@
     <div class="form-group">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
         <label class="form-label" style="margin-bottom: 0;">Allowed Scope Paths (Whitelisted Prefixes)</label>
-        <button type="button" class="btn btn-secondary btn-sm" onclick="addListItem('paths-container', 'e.g. app/Http/Controllers', 'allowed_paths')">+ Add Path</button>
+        <button type="button" class="btn btn-secondary btn-sm" style="display: inline-flex; align-items: center; gap: 4px;" onclick="addListItem('paths-container', 'e.g. app/Http/Controllers', 'allowed_paths')">
+          <span class="material-symbols-outlined" style="font-size: 14px;">add</span>
+          <span>Add Path</span>
+        </button>
       </div>
       <div id="paths-container">
         <div class="list-item-row" style="display: flex; gap: 8px; margin-bottom: 8px;">
           <input type="text" name="allowed_paths" class="form-input" placeholder="e.g. api/app" value="src" style="flex: 1; font-family: var(--font-mono); font-size: 12.5px;" />
-          <button type="button" class="btn btn-secondary btn-sm" onclick="this.parentElement.remove()">×</button>
+          <button type="button" class="btn btn-secondary btn-sm" onclick="this.parentElement.remove()">
+            <span class="material-symbols-outlined" style="font-size: 14px;">close</span>
+          </button>
         </div>
       </div>
       <div class="form-hint">Upper bounds on modified paths. If Jules modifies files outside these prefixes, validation fails.</div>
@@ -187,33 +232,44 @@
     <div class="form-group">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
         <label class="form-label" style="margin-bottom: 0;">Deterministic Validation Commands *</label>
-        <button type="button" class="btn btn-secondary btn-sm" onclick="addListItem('validation-container', 'e.g. pytest tests/unit', 'validation_commands')">+ Add Command</button>
+        <button type="button" class="btn btn-secondary btn-sm" style="display: inline-flex; align-items: center; gap: 4px;" onclick="addListItem('validation-container', 'e.g. pytest tests/unit', 'validation_commands')">
+          <span class="material-symbols-outlined" style="font-size: 14px;">add</span>
+          <span>Add Command</span>
+        </button>
       </div>
       <div id="validation-container">
         <div class="list-item-row" style="display: flex; gap: 8px; margin-bottom: 8px;">
           <input type="text" name="validation_commands" class="form-input" placeholder="e.g. php artisan test tests/Feature/SearchTest.php" value="true" style="flex: 1; font-family: var(--font-mono); font-size: 12.5px;" required />
-          <button type="button" class="btn btn-secondary btn-sm" onclick="this.parentElement.remove()">×</button>
+          <button type="button" class="btn btn-secondary btn-sm" onclick="this.parentElement.remove()">
+            <span class="material-symbols-outlined" style="font-size: 14px;">close</span>
+          </button>
         </div>
       </div>
       <div class="form-hint">Commands executed inside an isolated git worktree with the candidate patch applied. PASS requires exit code 0.</div>
     </div>
 
     <!-- Authority & Mode Toggles -->
-    <div style="background-color: var(--color-obsidian); padding: 14px 18px; border-radius: var(--radius-buttons); margin-bottom: 24px; border: 1px solid var(--color-graphite);">
-      <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; margin-bottom: 6px;">
-        <input type="checkbox" name="preauthorize_plan" value="true" checked style="accent-color: var(--color-smoke); cursor: pointer;" />
-        <span style="font-weight: 510; font-size: 13px; color: var(--color-paper);">Pre-authorize Bounded Plan</span>
-      </label>
-      <div style="font-size: 12px; color: var(--color-fog); margin-left: 24px; line-height: 1.4;">
-        Automatically dispatches Jules when the generated plan remains strictly within the allowed paths and safety boundaries. Uncheck to pause at PLAN_GATE for manual review.
+    <div style="background-color: var(--color-obsidian); padding: 16px 20px; border-radius: var(--radius-buttons); margin-bottom: 24px; border: 1px solid var(--color-graphite); display: flex; align-items: center; justify-content: space-between; gap: 16px;">
+      <div style="flex: 1;">
+        <label for="preauth-switch" style="display: block; font-weight: 510; font-size: 13px; color: var(--color-paper); margin-bottom: 4px; cursor: pointer;">
+          Pre-authorize Bounded Plan
+        </label>
+        <div style="font-size: 12px; color: var(--color-fog); line-height: 1.4;">
+          Automatically dispatches Jules when the generated plan remains strictly within the allowed paths and safety boundaries. Uncheck to pause at PLAN_GATE for manual review.
+        </div>
+      </div>
+      <div>
+        <md-switch id="preauth-switch" selected onchange="document.getElementById('preauthorize_plan').value = this.selected ? 'true' : 'false'"></md-switch>
+        <input type="hidden" id="preauthorize_plan" name="preauthorize_plan" value="true" />
       </div>
     </div>
 
     <!-- Action Buttons -->
     <div style="display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid var(--color-graphite); padding-top: 20px;">
       <a href="/dashboard" class="btn btn-secondary">Cancel</a>
-      <button type="submit" class="btn btn-primary" style="padding: 9px 24px;">
-        Launch New AI Goal
+      <button type="submit" class="btn btn-primary" style="padding: 9px 24px; display: inline-flex; align-items: center; gap: 8px;">
+        <span class="material-symbols-outlined" style="font-size: 18px;">rocket_launch</span>
+        <span>Launch New AI Goal</span>
       </button>
     </div>
 

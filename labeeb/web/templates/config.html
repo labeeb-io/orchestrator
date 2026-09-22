@@ -8,13 +8,16 @@
 
 {% block content %}
 <div style="max-width: 840px; margin: 0 auto;">
-  <div class="card tabs-container" style="padding: 0; overflow: hidden;">
-    <div class="tabs-nav" style="padding: 10px 20px 0 20px; background-color: var(--color-carbon); margin-bottom: 0;">
-      <button type="button" class="tab-btn active" data-tab="tab-visual-config">
-        <span>⚙️</span> Roles &amp; Workflow Settings
+  <div class="card tabs-container" style="padding: 0; overflow: hidden; position: relative;">
+    <md-elevation></md-elevation>
+    <div class="tabs-nav">
+      <button type="button" class="tab-btn active" data-tab="tab-visual-config" id="tab-btn-visual-config">
+        <span class="material-symbols-outlined tab-icon tab-icon-config">tune</span>
+        <span>Roles &amp; Workflow Settings</span>
       </button>
-      <button type="button" class="tab-btn" data-tab="tab-raw-toml">
-        <span>📄</span> Raw TOML Editor
+      <button type="button" class="tab-btn" data-tab="tab-raw-toml" id="tab-btn-raw-toml">
+        <span class="material-symbols-outlined tab-icon tab-icon-toml">description</span>
+        <span>Raw TOML Editor</span>
       </button>
     </div>
 
@@ -22,26 +25,38 @@
       <!-- Tab 1: Visual Settings -->
       <div id="tab-visual-config" class="tab-pane active">
         <div class="card" style="background-color: var(--color-obsidian); margin-bottom: 20px; border: 1px solid var(--color-graphite); padding: 14px 18px;">
-          <div style="font-weight: 510; font-size: 13px; color: var(--color-paper); margin-bottom: 4px;">Active Configuration File</div>
+          <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 4px;">
+            <span class="material-symbols-outlined" style="font-size: 16px; color: var(--color-fog);">source</span>
+            <div style="font-weight: 510; font-size: 13px; color: var(--color-paper);">Active Configuration File</div>
+          </div>
           <div style="font-family: var(--font-mono); font-size: 12px; color: var(--color-fog);">{{ config_path }}</div>
         </div>
 
         <h3 style="font-size: 14px; font-weight: 510; color: var(--color-paper); margin-bottom: 14px;">Configured Agent Roles</h3>
         <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 24px;">
           <div class="card" style="margin-bottom: 0; padding: 14px 16px; background-color: var(--color-obsidian); border: 1px solid var(--color-graphite);">
-            <div style="font-size: 11px; color: var(--color-fog); text-transform: uppercase; font-weight: 500; letter-spacing: 0.04em;">Brain Role</div>
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <div style="font-size: 11px; color: var(--color-fog); text-transform: uppercase; font-weight: 500; letter-spacing: 0.04em;">Brain Role</div>
+              <span class="material-symbols-outlined" style="font-size: 16px; color: var(--color-fog);">psychology</span>
+            </div>
             <div style="font-weight: 510; font-size: 14px; color: var(--color-paper); margin-top: 4px; font-family: var(--font-mono);">{{ config.get('roles.brain.runtime', config.get('workflow.brain_role', 'codex')) | upper }}</div>
             <div style="font-size: 11.5px; color: var(--color-ash); margin-top: 2px;">Transport: {{ config.get('roles.brain.transport', 'orchestrator') }}</div>
           </div>
 
           <div class="card" style="margin-bottom: 0; padding: 14px 16px; background-color: var(--color-obsidian); border: 1px solid var(--color-graphite);">
-            <div style="font-size: 11px; color: var(--color-fog); text-transform: uppercase; font-weight: 500; letter-spacing: 0.04em;">Critic Role</div>
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <div style="font-size: 11px; color: var(--color-fog); text-transform: uppercase; font-weight: 500; letter-spacing: 0.04em;">Critic Role</div>
+              <span class="material-symbols-outlined" style="font-size: 16px; color: var(--color-fog);">security</span>
+            </div>
             <div style="font-weight: 510; font-size: 14px; color: var(--color-paper); margin-top: 4px; font-family: var(--font-mono);">{{ config.get('roles.critic.runtime', 'claude') | upper }}</div>
             <div style="font-size: 11.5px; color: var(--color-ash); margin-top: 2px;">Model: {{ config.get('roles.critic.model', 'claude-3-opus-20240229') }}</div>
           </div>
 
           <div class="card" style="margin-bottom: 0; padding: 14px 16px; background-color: var(--color-obsidian); border: 1px solid var(--color-graphite);">
-            <div style="font-size: 11px; color: var(--color-fog); text-transform: uppercase; font-weight: 500; letter-spacing: 0.04em;">Implementer</div>
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <div style="font-size: 11px; color: var(--color-fog); text-transform: uppercase; font-weight: 500; letter-spacing: 0.04em;">Implementer</div>
+              <span class="material-symbols-outlined" style="font-size: 16px; color: var(--color-fog);">smart_toy</span>
+            </div>
             <div style="font-weight: 510; font-size: 14px; color: var(--color-paper); margin-top: 4px; font-family: var(--font-mono);">{{ config.get('roles.worker.runtime', 'jules') | upper }}</div>
             <div style="font-size: 11.5px; color: var(--color-ash); margin-top: 2px;">Provider: {{ config.get('roles.worker.provider', 'cjules') }}</div>
           </div>
@@ -86,7 +101,10 @@
           </div>
 
           <div style="display: flex; justify-content: flex-end; gap: 10px;">
-            <button type="submit" class="btn btn-secondary">Save Configuration</button>
+            <button type="submit" class="btn btn-secondary" style="display: inline-flex; align-items: center; gap: 6px;">
+              <span class="material-symbols-outlined" style="font-size: 16px;">save</span>
+              <span>Save Configuration</span>
+            </button>
           </div>
         </form>
       </div>

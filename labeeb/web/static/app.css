@@ -11,7 +11,7 @@
   --color-obsidian: #161718;
   --color-graphite: #23252a;
   --color-smoke: #383b3f;
-  
+
   /* Semantic Surface Mappings */
   --bg-canvas: var(--color-void);
   --bg-surface: var(--color-carbon);
@@ -75,6 +75,103 @@
   /* Shadows - Hairlines instead of heavy ambient drop shadows */
   --shadow-subtle: rgb(35, 37, 42) 0px 0px 0px 1px inset;
   --shadow-card: 0 0 0 1px var(--color-graphite);
+
+  /* Google Material Web (M3) Tokens */
+  --md-sys-color-primary: #e4f222;
+  --md-sys-color-on-primary: #08090a;
+  --md-sys-color-primary-container: #1e2200;
+  --md-sys-color-on-primary-container: #e4f222;
+  --md-sys-color-secondary: #d0d6e0;
+  --md-sys-color-on-secondary: #08090a;
+  --md-sys-color-secondary-container: #161718;
+  --md-sys-color-on-secondary-container: #ffffff;
+  --md-sys-color-surface: #0f1011;
+  --md-sys-color-on-surface: #ffffff;
+  --md-sys-color-surface-variant: #161718;
+  --md-sys-color-on-surface-variant: #8a8f98;
+  --md-sys-color-surface-container: #161718;
+  --md-sys-color-surface-container-high: #1c1e22;
+  --md-sys-color-surface-container-highest: #23252a;
+  --md-sys-color-outline: #383b3f;
+  --md-sys-color-outline-variant: #23252a;
+  --md-sys-color-error: #eb5757;
+  --md-sys-color-on-error: #08090a;
+  --md-sys-shape-corner-small: 4px;
+  --md-sys-shape-corner-medium: 6px;
+  --md-sys-shape-corner-large: 12px;
+  --md-ref-typeface-brand: 'Inter', system-ui, sans-serif;
+  --md-ref-typeface-plain: 'Inter', system-ui, sans-serif;
+}
+
+/* Google Material Symbols Font Utility */
+.material-symbols-outlined {
+  font-family: 'Material Symbols Outlined';
+  font-weight: normal;
+  font-style: normal;
+  font-size: 18px;
+  line-height: 1;
+  letter-spacing: normal;
+  text-transform: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  vertical-align: middle;
+  white-space: nowrap;
+  word-wrap: normal;
+  direction: ltr;
+  -webkit-font-feature-settings: 'liga';
+  font-feature-settings: 'liga';
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Material Web Components Midnight Precision Styling */
+md-filled-button.cta-acid-lime {
+  --md-filled-button-container-color: #e4f222;
+  --md-filled-button-label-text-color: #08090a;
+  --md-filled-button-icon-color: #08090a;
+  --md-filled-button-container-shape: 6px;
+  font-weight: 510;
+}
+
+md-outlined-button {
+  --md-outlined-button-outline-color: #23252a;
+  --md-outlined-button-label-text-color: #d0d6e0;
+  --md-outlined-button-icon-color: #8a8f98;
+  --md-outlined-button-container-shape: 6px;
+}
+
+md-outlined-text-field, md-outlined-select {
+  --md-outlined-text-field-outline-color: #23252a;
+  --md-outlined-text-field-focus-outline-color: #d0d6e0;
+  --md-outlined-text-field-input-text-color: #ffffff;
+  --md-outlined-text-field-label-text-color: #8a8f98;
+  --md-outlined-text-field-focus-label-text-color: #ffffff;
+  --md-outlined-text-field-container-shape: 6px;
+}
+
+md-tabs {
+  --md-tabs-container-color: transparent;
+  --md-primary-tab-active-indicator-color: #e4f222;
+  --md-primary-tab-label-text-color: #8a8f98;
+  --md-primary-tab-active-label-text-color: #ffffff;
+  --md-primary-tab-active-icon-color: #ffffff;
+  --md-primary-tab-icon-color: #8a8f98;
+}
+
+md-checkbox {
+  --md-checkbox-outline-color: #383b3f;
+  --md-checkbox-selected-container-color: #e4f222;
+  --md-checkbox-selected-icon-color: #08090a;
+}
+
+md-switch {
+  --md-switch-selected-handle-color: #e4f222;
+  --md-switch-selected-track-color: #1e2200;
+}
+
+md-linear-progress {
+  --md-linear-progress-active-indicator-color: #e4f222;
+  --md-linear-progress-track-color: #161718;
 }
 
 /* Base Reset */
@@ -547,40 +644,225 @@ body {
 }
 
 /* ==========================================================================
-   Tabs
+   Goal Detail Header Enhancements
+   ========================================================================== */
+
+.header-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background-color: var(--color-obsidian);
+  border: 1px solid var(--color-graphite);
+  border-radius: var(--radius-buttons);
+  padding: 3px 8px;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--color-mist);
+  line-height: 1.2;
+}
+
+.header-chip-id {
+  color: var(--color-bone);
+  border-color: rgba(56, 189, 248, 0.3);
+  background-color: rgba(56, 189, 248, 0.05);
+}
+
+.header-chip-repo {
+  border-color: rgba(251, 191, 36, 0.3);
+  background-color: rgba(251, 191, 36, 0.05);
+}
+
+.header-chip-branch {
+  border-color: rgba(192, 132, 252, 0.3);
+  background-color: rgba(192, 132, 252, 0.05);
+}
+
+.copy-icon-btn {
+  background: transparent;
+  border: none;
+  color: var(--color-fog);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px;
+  border-radius: 3px;
+  margin-left: 2px;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.copy-icon-btn:hover {
+  color: var(--color-paper);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.session-meta-bar {
+  display: flex;
+  gap: 10px;
+  border-top: 1px solid var(--color-graphite);
+  padding-top: 14px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.meta-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background-color: var(--color-obsidian);
+  border: 1px solid var(--color-graphite);
+  border-radius: var(--radius-buttons);
+  padding: 5px 12px;
+  font-size: 12px;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.meta-pill:hover {
+  border-color: var(--color-smoke);
+  background-color: rgba(255, 255, 255, 0.02);
+}
+
+.meta-icon {
+  font-size: 15px !important;
+  display: inline-flex;
+}
+
+.meta-icon-phase-pass { color: #27a644 !important; }
+.meta-icon-phase-fail { color: #eb5757 !important; }
+.meta-icon-phase-active { color: #e4f222 !important; }
+
+.meta-label {
+  color: var(--color-fog);
+  font-size: 11.5px;
+}
+
+.meta-val {
+  font-family: var(--font-mono);
+  color: var(--color-paper);
+  font-weight: 500;
+}
+
+.meta-val.phase-val {
+  color: #ffffff;
+  letter-spacing: 0.02em;
+}
+
+.meta-val.text-dim {
+  color: var(--color-ash);
+  font-weight: 400;
+}
+
+/* ==========================================================================
+   Tabs Navigation & Precision Color Accents
    ========================================================================== */
 
 .tabs-nav {
   display: flex;
   border-bottom: 1px solid var(--color-graphite);
-  gap: 6px;
+  gap: 4px;
   background-color: var(--color-carbon);
+  padding: 0 12px;
+  overflow-x: auto;
+  align-items: stretch;
 }
 
 .tab-btn {
-  padding: 10px 14px;
+  padding: 12px 16px;
   background: transparent;
   border: none;
-  border-bottom: 1.5px solid transparent;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
   color: var(--color-fog);
   font-size: 13px;
-  font-weight: 400;
+  font-weight: 480;
+  letter-spacing: -0.01em;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  transition: color 0.15s ease, border-color 0.15s ease;
+  gap: 8px;
+  white-space: nowrap;
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
   font-family: var(--font-sans);
+  border-radius: 6px 6px 0 0;
+  position: relative;
 }
 
-.tab-btn:hover {
+.tab-btn:hover:not(:disabled) {
   color: var(--color-paper);
+  background-color: rgba(255, 255, 255, 0.035);
 }
 
 .tab-btn.active {
-  color: var(--color-paper);
-  border-bottom-color: var(--color-paper);
-  font-weight: 510;
+  color: #ffffff;
+  border-bottom-color: var(--color-acid-lime);
+  font-weight: 550;
+  background: linear-gradient(180deg, rgba(228, 242, 34, 0.03) 0%, rgba(228, 242, 34, 0.08) 100%);
+}
+
+.tab-btn:disabled,
+.tab-btn[disabled] {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+/* Semantic Vibrant Tab Icon Accents */
+.tab-icon {
+  font-size: 17px !important;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.18s ease, filter 0.18s ease;
+}
+
+.tab-btn:hover:not(:disabled) .tab-icon {
+  transform: translateY(-1px);
+}
+
+/* Timeline & Events: Signal Teal / Cyan */
+.tab-icon-timeline {
+  color: #06b6d4 !important;
+  filter: drop-shadow(0 0 6px rgba(6, 182, 212, 0.35));
+}
+
+/* Contract & Plan: Acid Lime / Electric Yellow */
+.tab-icon-plan {
+  color: #e4f222 !important;
+  filter: drop-shadow(0 0 6px rgba(228, 242, 34, 0.4));
+}
+
+/* Evidence & Git Patch: Lavender / Biotech Violet */
+.tab-icon-evidence {
+  color: #a78bfa !important;
+  filter: drop-shadow(0 0 6px rgba(167, 139, 250, 0.35));
+}
+
+/* Claude Critic: Coral Red / Crimson */
+.tab-icon-critic {
+  color: #f87171 !important;
+  filter: drop-shadow(0 0 6px rgba(248, 113, 113, 0.35));
+}
+
+/* Visual Summary & Analytics: Electric Blue */
+.tab-icon-summary {
+  color: #60a5fa !important;
+  filter: drop-shadow(0 0 6px rgba(96, 165, 250, 0.35));
+}
+
+/* Terminal & Raw Logs: Mint Green / Emerald */
+.tab-icon-raw {
+  color: #34d399 !important;
+  filter: drop-shadow(0 0 6px rgba(52, 211, 153, 0.35));
+}
+
+/* Config Tab Icons */
+.tab-icon-config {
+  color: #fbbf24 !important;
+  filter: drop-shadow(0 0 6px rgba(251, 191, 36, 0.35));
+}
+
+.tab-icon-toml {
+  color: #38bdf8 !important;
+  filter: drop-shadow(0 0 6px rgba(56, 189, 248, 0.35));
 }
 
 .tab-pane {
@@ -829,9 +1111,44 @@ body {
 }
 
 .risk-card input[type="checkbox"] {
-  margin-top: 3px;
-  accent-color: var(--color-smoke);
+  appearance: none;
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  border: 1.5px solid var(--color-smoke);
+  border-radius: 4px;
+  background-color: transparent;
+  outline: none;
   cursor: pointer;
+  margin-top: 2px;
+  display: inline-grid;
+  place-content: center;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.risk-card input[type="checkbox"]:hover {
+  border-color: var(--color-mist);
+}
+
+.risk-card input[type="checkbox"]:checked {
+  background-color: var(--color-acid-lime);
+  border-color: var(--color-acid-lime);
+}
+
+.risk-card input[type="checkbox"]::before {
+  content: "";
+  width: 9px;
+  height: 9px;
+  clip-path: polygon(14% 44%, 0 65%, 50% 100%, 100% 16%, 80% 0%, 43% 62%);
+  transform: scale(0);
+  transform-origin: bottom left;
+  transition: 120ms transform ease-in-out;
+  background-color: var(--color-void);
+}
+
+.risk-card input[type="checkbox"]:checked::before {
+  transform: scale(1);
 }
 
 .risk-card-content {

@@ -2,7 +2,8 @@
 <div class="decision-banner" id="decision-banner">
   <div class="decision-info">
     <h3 style="display: flex; align-items: center; gap: 8px;">
-      <span style="color: var(--color-paper);">⚠ Human Decision Required: Plan Gate</span>
+      <span class="material-symbols-outlined" style="font-size: 20px; color: var(--color-paper);">gavel</span>
+      <span style="color: var(--color-paper);">Human Decision Required: Plan Gate</span>
     </h3>
     <p style="color: var(--color-mist); margin-top: 4px;">Labeeb has produced an implementation contract and plan. Explicit authorization is required to dispatch Jules.</p>
   </div>
@@ -10,14 +11,18 @@
     <button type="button" class="btn btn-primary"
             hx-post="/api/goals/{{ goal.goal_id }}/approve"
             hx-swap="none"
-            onclick="this.innerText='Dispatching...'; this.disabled=true;">
-      Approve Plan &amp; Dispatch Jules
+            onclick="this.innerText='Dispatching...'; this.disabled=true;"
+            style="display: inline-flex; align-items: center; gap: 6px;">
+      <span class="material-symbols-outlined" style="font-size: 16px;">check_circle</span>
+      <span>Approve Plan &amp; Dispatch Jules</span>
     </button>
     <button type="button" class="btn btn-danger"
             hx-post="/api/goals/{{ goal.goal_id }}/stop"
             hx-swap="none"
-            onclick="this.innerText='Stopping...'; this.disabled=true;">
-      Stop Goal
+            onclick="this.innerText='Stopping...'; this.disabled=true;"
+            style="display: inline-flex; align-items: center; gap: 6px;">
+      <span class="material-symbols-outlined" style="font-size: 16px;">stop_circle</span>
+      <span>Stop Goal</span>
     </button>
   </div>
 </div>
@@ -25,13 +30,14 @@
 <div class="decision-banner" style="border-color: rgba(235, 87, 87, 0.3); background-color: var(--color-obsidian);">
   <div class="decision-info" style="flex: 1;">
     <h3 style="color: var(--color-coral-red); display: flex; align-items: center; gap: 8px;">
-      <span>⊘ Automation Stopped: Goal Blocked</span>
+      <span class="material-symbols-outlined" style="font-size: 20px;">block</span>
+      <span>Automation Stopped: Goal Blocked</span>
     </h3>
     <p style="margin-bottom: 8px; color: var(--color-mist);">{{ goal.result.reason if goal.result else 'Ambiguous state or safety violation detected.' }}</p>
 
     {% if goal.brain_transient_retries is defined and goal.brain_transient_retries > 0 %}
       <div style="display: inline-flex; align-items: center; gap: 6px; padding: 3px 8px; background: rgba(235, 87, 87, 0.06); border: 1px solid rgba(235, 87, 87, 0.2); border-radius: var(--radius-badges); font-size: 11px; font-family: var(--font-mono); color: var(--color-coral-red); margin-top: 4px;">
-        <span>⟳</span>
+        <span class="material-symbols-outlined" style="font-size: 13px;">sync</span>
         <span>Auto-retry exhausted: {{ goal.brain_transient_retries }}/{{ retry_limit | default(3) }} attempts used</span>
       </div>
     {% endif %}
@@ -60,28 +66,36 @@
       <button type="button" class="btn btn-secondary btn-sm"
               hx-post="/api/goals/{{ goal.goal_id }}/reconcile"
               hx-swap="none"
-              onclick="this.innerText='Reconciling...'; this.disabled=true;">
-        ↻ Reconcile Again
+              onclick="this.innerText='Reconciling...'; this.disabled=true;"
+              style="display: inline-flex; align-items: center; justify-content: center; gap: 4px;">
+        <span class="material-symbols-outlined" style="font-size: 14px;">sync</span>
+        <span>Reconcile Again</span>
       </button>
     {% else %}
       <button type="button" class="btn btn-secondary btn-sm"
               hx-post="/api/goals/{{ goal.goal_id }}/unblock"
               hx-swap="none"
-              onclick="this.innerText='Unblocking...'; this.disabled=true;">
-        🔄 Unblock &amp; Retry
+              onclick="this.innerText='Unblocking...'; this.disabled=true;"
+              style="display: inline-flex; align-items: center; justify-content: center; gap: 4px;">
+        <span class="material-symbols-outlined" style="font-size: 14px;">restart_alt</span>
+        <span>Unblock &amp; Retry</span>
       </button>
       <button type="button" class="btn btn-secondary btn-sm"
               hx-post="/api/goals/{{ goal.goal_id }}/resume"
               hx-vals='{"once": true}'
               hx-swap="none"
-              onclick="this.innerText='Reconciling...'; this.disabled=true;">
-        ↻ Reconcile Once
+              onclick="this.innerText='Reconciling...'; this.disabled=true;"
+              style="display: inline-flex; align-items: center; justify-content: center; gap: 4px;">
+        <span class="material-symbols-outlined" style="font-size: 14px;">refresh</span>
+        <span>Reconcile Once</span>
       </button>
     {% endif %}
     <button type="button" class="btn btn-danger btn-sm"
             hx-post="/api/goals/{{ goal.goal_id }}/stop"
-            hx-swap="none">
-      Stop Goal
+            hx-swap="none"
+            style="display: inline-flex; align-items: center; justify-content: center; gap: 4px;">
+      <span class="material-symbols-outlined" style="font-size: 14px;">stop_circle</span>
+      <span>Stop Goal</span>
     </button>
   </div>
 </div>

@@ -4,21 +4,35 @@
 
 {% block header_title %}
   <div style="display: flex; align-items: center; gap: 8px;">
-    <a href="/dashboard" style="color: var(--color-fog); text-decoration: none; font-size: 14px;">Goals</a>
+    <a href="/dashboard" style="color: var(--color-fog); text-decoration: none; font-size: 13.5px; display: inline-flex; align-items: center; gap: 5px; transition: color 0.15s ease;">
+      <span class="material-symbols-outlined" style="font-size: 16px; color: var(--color-ash);">dashboard</span>
+      <span>Goals</span>
+    </a>
     <span style="color: var(--color-graphite); font-size: 12px;">/</span>
-    <span style="font-family: var(--font-mono); font-size: 13.5px; color: var(--color-paper);">{{ goal.goal_id[:8] }}</span>
+    <span style="font-family: var(--font-mono); font-size: 12.5px; color: var(--color-paper); background: rgba(255, 255, 255, 0.04); border: 1px solid var(--color-graphite); padding: 2px 8px; border-radius: 4px;">
+      {{ goal.goal_id[:8] }}
+    </span>
   </div>
 {% endblock %}
 
 {% block header_actions %}
   <div style="display: flex; gap: 8px; align-items: center;">
     {% if goal.phase == 'PLAN_GATE' %}
-      <button class="btn btn-primary btn-sm" hx-post="/api/goals/{{ goal.goal_id }}/approve" hx-swap="none">Approve Plan</button>
+      <button class="btn btn-primary btn-sm" hx-post="/api/goals/{{ goal.goal_id }}/approve" hx-swap="none" style="display: inline-flex; align-items: center; gap: 6px;">
+        <span class="material-symbols-outlined" style="font-size: 16px;">check</span>
+        <span>Approve Plan</span>
+      </button>
     {% endif %}
     {% if goal.phase not in ['PASS', 'FAIL', 'BLOCKED'] %}
-      <button class="btn btn-danger btn-sm" hx-post="/api/goals/{{ goal.goal_id }}/stop" hx-swap="none">Stop</button>
+      <button class="btn btn-danger btn-sm" hx-post="/api/goals/{{ goal.goal_id }}/stop" hx-swap="none" style="display: inline-flex; align-items: center; gap: 6px;">
+        <span class="material-symbols-outlined" style="font-size: 16px;">stop_circle</span>
+        <span>Stop</span>
+      </button>
     {% endif %}
-    <a href="/dashboard" class="btn btn-secondary btn-sm">Dashboard</a>
+    <a href="/dashboard" class="btn btn-secondary btn-sm" style="display: inline-flex; align-items: center; gap: 6px;">
+      <span class="material-symbols-outlined" style="font-size: 16px; color: var(--color-mist);">arrow_back</span>
+      <span>Dashboard</span>
+    </a>
   </div>
 {% endblock %}
 
@@ -31,19 +45,37 @@
      hx-select="#goal-detail-container"
      hx-swap="outerHTML">
 
+  {% if goal.phase in ['THINKING', 'WAITING_JULES', 'VALIDATING', 'REVIEWING', 'EFFECT'] %}
+    <md-linear-progress indeterminate style="width: 100%; height: 2px; margin-bottom: 16px;"></md-linear-progress>
+  {% endif %}
+
   <!-- Goal Header Banner -->
-  <div class="card" style="margin-bottom: 20px;">
-    <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 20px; margin-bottom: 12px;">
-      <div style="flex: 1;">
-        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap;">
-          <span style="font-family: var(--font-mono); font-size: 12px; color: var(--color-fog);">{{ goal.goal_id }}</span>
-          <button class="copy-btn" onclick="copyText('{{ goal.goal_id }}', this)">copy</button>
-          <span style="color: var(--color-graphite);">•</span>
-          <span style="font-family: var(--font-mono); font-size: 12px; color: var(--color-mist);">📁 {{ goal.contract.repo if goal.contract else '' }}</span>
-          <span style="color: var(--color-graphite);">•</span>
-          <span style="font-family: var(--font-mono); font-size: 12px; color: var(--color-mist);">🌿 {{ goal.contract.branch if goal.contract else '' }}</span>
+  <div class="card" style="margin-bottom: 20px; position: relative;">
+    <md-elevation></md-elevation>
+    <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 20px; margin-bottom: 14px;">
+      <div style="flex: 1; min-width: 0;">
+        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 10px; flex-wrap: wrap;">
+          <div class="header-chip header-chip-id">
+            <span class="material-symbols-outlined" style="font-size: 13px; color: #38bdf8;">fingerprint</span>
+            <span>{{ goal.goal_id }}</span>
+            <button type="button" class="copy-icon-btn" onclick="copyText('{{ goal.goal_id }}', this)" title="Copy Goal ID">
+              <span class="material-symbols-outlined" style="font-size: 13px;">content_copy</span>
+            </button>
+          </div>
+          {% if goal.contract and goal.contract.repo %}
+            <div class="header-chip header-chip-repo">
+              <span class="material-symbols-outlined" style="font-size: 14px; color: #fbbf24;">folder</span>
+              <span>{{ goal.contract.repo }}</span>
+            </div>
+          {% endif %}
+          {% if goal.contract and goal.contract.branch %}
+            <div class="header-chip header-chip-branch">
+              <span class="material-symbols-outlined" style="font-size: 14px; color: #c084fc;">alt_route</span>
+              <span>{{ goal.contract.branch }}</span>
+            </div>
+          {% endif %}
         </div>
-        <h2 style="font-size: 18px; font-weight: 510; color: var(--color-paper); line-height: 1.4; letter-spacing: -0.015em;">
+        <h2 style="font-size: 19px; font-weight: 590; color: #ffffff; line-height: 1.45; letter-spacing: -0.015em; word-break: break-word;">
           {{ goal.contract.intent if goal.contract else 'Goal #' + goal.goal_id[:8] }}
         </h2>
       </div>
@@ -55,26 +87,30 @@
     </div>
 
     <!-- Active Worker & Session Metadata Row -->
-    <div style="display: flex; gap: 20px; font-size: 12px; border-top: 1px solid var(--color-graphite); padding-top: 12px; color: var(--color-mist); flex-wrap: wrap;">
-      <div>
-        <span style="color: var(--color-fog);">Current Phase:</span>
-        <strong id="goal-phase-text" style="font-family: var(--font-mono); color: var(--color-paper); font-weight: 500;">{{ goal.phase }}</strong>
+    <div class="session-meta-bar">
+      <div class="meta-pill">
+        <span class="material-symbols-outlined meta-icon {% if goal.phase == 'PASS' %}meta-icon-phase-pass{% elif goal.phase in ['FAIL', 'BLOCKED'] %}meta-icon-phase-fail{% else %}meta-icon-phase-active{% endif %}">flag</span>
+        <span class="meta-label">Current Phase:</span>
+        <strong id="goal-phase-text" class="meta-val phase-val">{{ goal.phase }}</strong>
       </div>
-      <div>
-        <span style="color: var(--color-fog);">Active Task:</span>
-        <span style="font-family: var(--font-mono); color: var(--color-paper);">{{ goal.active_task.role if goal.active_task else 'None (waiting)' }}</span>
+      <div class="meta-pill">
+        <span class="material-symbols-outlined meta-icon" style="color: #f59e0b;">smart_toy</span>
+        <span class="meta-label">Active Task:</span>
+        <span class="meta-val">{{ goal.active_task.role if goal.active_task else 'None (waiting)' }}</span>
       </div>
-      <div>
-        <span style="color: var(--color-fog);">Jules Session:</span>
+      <div class="meta-pill">
+        <span class="material-symbols-outlined meta-icon" style="color: #818cf8;">terminal</span>
+        <span class="meta-label">Jules Session:</span>
         {% if goal.jules_session_id %}
-          <span style="font-family: var(--font-mono); color: var(--color-paper);">{{ goal.jules_session_id }}</span>
+          <span class="meta-val">{{ goal.jules_session_id }}</span>
         {% else %}
-          <span style="color: var(--color-ash); font-family: var(--font-mono);">Not started</span>
+          <span class="meta-val text-dim">Not started</span>
         {% endif %}
       </div>
-      <div>
-        <span style="color: var(--color-fog);">Repair Budget:</span>
-        <span style="font-family: var(--font-mono); color: var(--color-paper);">{{ '1/1 Used' if goal.repair_reserved else '0/1 Used' }}</span>
+      <div class="meta-pill">
+        <span class="material-symbols-outlined meta-icon" style="color: #06b6d4;">shield</span>
+        <span class="meta-label">Repair Budget:</span>
+        <span class="meta-val">{{ '1/1 Used' if goal.repair_reserved else '0/1 Used' }}</span>
       </div>
     </div>
   </div>
@@ -129,25 +165,32 @@
   </div>
 
   <!-- Main Multi-Tab Interface -->
-  <div class="card tabs-container" style="padding: 0; overflow: hidden;">
-    <div class="tabs-nav" style="padding: 10px 20px 0 20px; background-color: var(--color-carbon); margin-bottom: 0;">
-      <button type="button" class="tab-btn active" data-tab="tab-timeline">
-        <span>🕒</span> Timeline &amp; Events
+  <div class="card tabs-container" style="padding: 0; overflow: hidden; position: relative;">
+    <md-elevation></md-elevation>
+    <div class="tabs-nav">
+      <button type="button" class="tab-btn active" data-tab="tab-timeline" id="tab-btn-timeline">
+        <span class="material-symbols-outlined tab-icon tab-icon-timeline">history</span>
+        <span>Timeline &amp; Events</span>
       </button>
-      <button type="button" class="tab-btn" data-tab="tab-plan">
-        <span>📋</span> Contract &amp; Plan
+      <button type="button" class="tab-btn" data-tab="tab-plan" id="tab-btn-plan">
+        <span class="material-symbols-outlined tab-icon tab-icon-plan">description</span>
+        <span>Contract &amp; Plan</span>
       </button>
-      <button type="button" class="tab-btn" data-tab="tab-evidence">
-        <span>🧪</span> Evidence &amp; Git Patch
+      <button type="button" class="tab-btn" data-tab="tab-evidence" id="tab-btn-evidence">
+        <span class="material-symbols-outlined tab-icon tab-icon-evidence">biotech</span>
+        <span>Evidence &amp; Git Patch</span>
       </button>
-      <button type="button" class="tab-btn" data-tab="tab-critic">
-        <span>🧐</span> Claude Critic
+      <button type="button" class="tab-btn" data-tab="tab-critic" id="tab-btn-critic">
+        <span class="material-symbols-outlined tab-icon tab-icon-critic">security</span>
+        <span>Claude Critic</span>
       </button>
-      <button type="button" class="tab-btn" data-tab="tab-summary" {% if goal.phase not in ['PASS', 'FAIL', 'BLOCKED'] %}disabled title="Session in progress. Available once complete." style="opacity: 0.4; cursor: not-allowed;"{% endif %}>
-        <span>📊</span> Visual Summary &amp; Logs
+      <button type="button" class="tab-btn" data-tab="tab-summary" id="tab-btn-summary" {% if goal.phase not in ['PASS', 'FAIL', 'BLOCKED'] %}disabled title="Session in progress. Available once complete."{% endif %}>
+        <span class="material-symbols-outlined tab-icon tab-icon-summary">analytics</span>
+        <span>Visual Summary &amp; Logs</span>
       </button>
-      <button type="button" class="tab-btn" data-tab="tab-raw">
-        <span>🔍</span> Raw State &amp; Logs
+      <button type="button" class="tab-btn" data-tab="tab-raw" id="tab-btn-raw">
+        <span class="material-symbols-outlined tab-icon tab-icon-raw">terminal</span>
+        <span>Raw State &amp; Logs</span>
       </button>
     </div>
 
@@ -368,7 +411,9 @@
       <div id="tab-summary" class="tab-pane">
         {% if goal.phase not in ['PASS', 'FAIL', 'BLOCKED'] %}
           <div class="card" style="text-align: center; padding: 48px 20px; background-color: var(--color-obsidian);">
-            <div style="font-size: 28px; margin-bottom: 12px; opacity: 0.8;">⏳</div>
+            <div style="display: flex; justify-content: center; margin-bottom: 12px;">
+              <span class="material-symbols-outlined" style="font-size: 36px; color: var(--color-fog);">hourglass_top</span>
+            </div>
             <h3 style="font-size: 14px; font-weight: 510; color: var(--color-paper); margin-bottom: 8px;">Session Currently Active</h3>
             <p style="font-size: 13px; color: var(--color-fog); max-width: 500px; margin: 0 auto; line-height: 1.5;">
               The comprehensive visual execution audit, key performance metrics, and parsed controller logs will unlock here once the session reaches a terminal state (<strong>PASS</strong>, <strong>FAIL</strong>, or <strong>BLOCKED</strong>).
@@ -393,8 +438,14 @@
                 </span>
               </div>
               <div style="display: flex; align-items: center; gap: 16px; font-family: var(--font-mono); font-size: 12px; color: var(--color-fog);">
-                <span>⏱️ Duration: <strong style="color: var(--color-paper);">{{ duration_str }}</strong></span>
-                <span>📅 Completed: <strong style="color: var(--color-paper);">{{ goal.updated_at[11:19] if goal.updated_at else 'N/A' }}</strong></span>
+                <span style="display: inline-flex; align-items: center; gap: 4px;">
+                  <span class="material-symbols-outlined" style="font-size: 14px;">timer</span>
+                  <span>Duration: <strong style="color: var(--color-paper);">{{ duration_str }}</strong></span>
+                </span>
+                <span style="display: inline-flex; align-items: center; gap: 4px;">
+                  <span class="material-symbols-outlined" style="font-size: 14px;">calendar_today</span>
+                  <span>Completed: <strong style="color: var(--color-paper);">{{ goal.updated_at[11:19] if goal.updated_at else 'N/A' }}</strong></span>
+                </span>
               </div>
             </div>
             {% if result_data and result_data.decision and result_data.decision.reason %}
@@ -461,16 +512,18 @@
           <h3 style="font-size: 14px; font-weight: 510; margin-bottom: 14px; color: var(--color-paper);">Execution Journey &amp; Milestones</h3>
           <div style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 28px;">
             <div style="display: flex; gap: 14px; align-items: flex-start; padding: 12px 16px; background-color: var(--color-obsidian); border: 1px solid var(--color-graphite); border-radius: var(--radius-buttons);">
-              <div style="font-weight: 510; font-size: 13px; min-width: 140px; color: var(--color-paper);">1. Contract &amp; Audit</div>
+              <span class="material-symbols-outlined" style="font-size: 18px; color: var(--color-fog); margin-top: 2px;">fact_check</span>
               <div style="flex: 1; font-size: 12.5px; color: var(--color-mist); line-height: 1.5;">
+                <div style="font-weight: 510; color: var(--color-paper); margin-bottom: 2px;">1. Contract &amp; Audit</div>
                 Intent registered for <code>{{ goal.contract.repo if goal.contract else '' }}</code> (branch: <code>{{ goal.contract.branch if goal.contract else '' }}</code>).
                 Allowed paths: <span style="font-family: var(--font-mono); color: var(--color-paper);">{{ goal.contract.allowed_paths | join(', ') if goal.contract and goal.contract.allowed_paths else 'All' }}</span>.
               </div>
             </div>
 
             <div style="display: flex; gap: 14px; align-items: flex-start; padding: 12px 16px; background-color: var(--color-obsidian); border: 1px solid var(--color-graphite); border-radius: var(--radius-buttons);">
-              <div style="font-weight: 510; font-size: 13px; min-width: 140px; color: var(--color-paper);">2. Brain Planning</div>
+              <span class="material-symbols-outlined" style="font-size: 18px; color: var(--color-fog); margin-top: 2px;">psychology</span>
               <div style="flex: 1; font-size: 12.5px; color: var(--color-mist); line-height: 1.5;">
+                <div style="font-weight: 510; color: var(--color-paper); margin-bottom: 2px;">2. Brain Planning</div>
                 {% if goal.plan and goal.plan.plan_summary %}
                   {{ goal.plan.plan_summary }}
                 {% else %}
@@ -480,8 +533,9 @@
             </div>
 
             <div style="display: flex; gap: 14px; align-items: flex-start; padding: 12px 16px; background-color: var(--color-obsidian); border: 1px solid var(--color-graphite); border-radius: var(--radius-buttons);">
-              <div style="font-weight: 510; font-size: 13px; min-width: 140px; color: var(--color-paper);">3. Critic Review</div>
+              <span class="material-symbols-outlined" style="font-size: 18px; color: var(--color-fog); margin-top: 2px;">verified_user</span>
               <div style="flex: 1; font-size: 12.5px; color: var(--color-mist); line-height: 1.5;">
+                <div style="font-weight: 510; color: var(--color-paper); margin-bottom: 2px;">3. Critic Review</div>
                 {% if critic_reviews %}
                   Claude Critic completed {{ critic_reviews | length }} review(s) with {{ goal.critic_findings | length if goal.critic_findings else 0 }} material finding(s).
                 {% else %}
@@ -491,8 +545,9 @@
             </div>
 
             <div style="display: flex; gap: 14px; align-items: flex-start; padding: 12px 16px; background-color: var(--color-obsidian); border: 1px solid var(--color-graphite); border-radius: var(--radius-buttons);">
-              <div style="font-weight: 510; font-size: 13px; min-width: 140px; color: var(--color-paper);">4. Worker Execution</div>
+              <span class="material-symbols-outlined" style="font-size: 18px; color: var(--color-fog); margin-top: 2px;">smart_toy</span>
               <div style="flex: 1; font-size: 12.5px; color: var(--color-mist); line-height: 1.5;">
+                <div style="font-weight: 510; color: var(--color-paper); margin-bottom: 2px;">4. Worker Execution</div>
                 {% if goal.jules_session_id %}
                   Jules executed prompt in session <code>{{ goal.jules_session_id }}</code> and generated code changes.
                 {% else %}
@@ -502,8 +557,9 @@
             </div>
 
             <div style="display: flex; gap: 14px; align-items: flex-start; padding: 12px 16px; background-color: var(--color-obsidian); border: 1px solid var(--color-graphite); border-radius: var(--radius-buttons);" class="{% if evidence and evidence.validation and evidence.validation.status == 'PASS' %}border-l-pass{% else %}border-l-fail{% endif %}">
-              <div style="font-weight: 510; font-size: 13px; min-width: 140px; color: var(--color-paper);">5. Worktree Validation</div>
+              <span class="material-symbols-outlined" style="font-size: 18px; color: var(--color-pulse-green); margin-top: 2px;">rule</span>
               <div style="flex: 1; font-size: 12.5px; color: var(--color-mist); line-height: 1.5;">
+                <div style="font-weight: 510; color: var(--color-paper); margin-bottom: 2px;">5. Worktree Validation</div>
                 {% if evidence and evidence.validation and evidence.validation.commands %}
                   Executed {{ evidence.validation.commands | length }} deterministic validation command(s) in an isolated git worktree. All commands exited with code 0.
                 {% else %}
@@ -513,8 +569,9 @@
             </div>
 
             <div style="display: flex; gap: 14px; align-items: flex-start; padding: 12px 16px; background-color: var(--color-obsidian); border: 1px solid var(--color-graphite); border-radius: var(--radius-buttons);" class="{% if goal.phase == 'PASS' %}border-l-pass{% elif goal.phase == 'FAIL' %}border-l-fail{% else %}border-l-warn{% endif %}">
-              <div style="font-weight: 510; font-size: 13px; min-width: 140px; color: var(--color-paper);">6. Final Verification</div>
+              <span class="material-symbols-outlined" style="font-size: 18px; color: var(--color-paper); margin-top: 2px;">task_alt</span>
               <div style="flex: 1; font-size: 12.5px; color: var(--color-mist); line-height: 1.5;">
+                <div style="font-weight: 510; color: var(--color-paper); margin-bottom: 2px;">6. Final Verification</div>
                 Brain confirmed changes satisfy the contract without regressions. Result: <strong style="color: var(--color-paper); font-family: var(--font-mono);">{{ goal.phase }}</strong>.
               </div>
             </div>

@@ -6,8 +6,11 @@
   <title>{% block title %}Labeeb Orchestrator{% endblock %}</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;510;590;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;510;590;600;700&family=JetBrains+Mono:wght@400;500;600&family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/app.css">
+  
+  <!-- Google Material Web Components M3 -->
+  <script type="module" src="https://cdn.jsdelivr.net/npm/@material/web/all.js/+esm"></script>
   <script src="/static/htmx.min.js"></script>
   <script src="/static/app.js" defer></script>
   {% block head %}{% endblock %}
@@ -17,7 +20,9 @@
     <!-- Left Navigation Sidebar -->
     <aside class="sidebar">
       <div class="sidebar-brand">
-        <div class="brand-icon">L</div>
+        <div class="brand-icon">
+          <span class="material-symbols-outlined" style="font-size: 16px;">terminal</span>
+        </div>
         <div>
           <div class="brand-title">Labeeb Control</div>
         </div>
@@ -26,16 +31,20 @@
 
       <nav class="sidebar-nav">
         <a href="/dashboard" class="nav-link {% if active_page == 'dashboard' %}active{% endif %}">
-          <span style="font-size: 14px; opacity: 0.85;">📊</span> Dashboard
+          <span class="material-symbols-outlined" style="font-size: 18px;">dashboard</span>
+          <span>Dashboard</span>
         </a>
         <a href="/goals/new" class="nav-link {% if active_page == 'goal_new' %}active{% endif %}">
-          <span style="font-size: 14px; opacity: 0.85;">➕</span> New Goal
+          <span class="material-symbols-outlined" style="font-size: 18px;">add_circle</span>
+          <span>New Goal</span>
         </a>
         <a href="/config" class="nav-link {% if active_page == 'config' %}active{% endif %}">
-          <span style="font-size: 14px; opacity: 0.85;">⚙️</span> Configuration
+          <span class="material-symbols-outlined" style="font-size: 18px;">tune</span>
+          <span>Configuration</span>
         </a>
         <a href="/doctor" class="nav-link {% if active_page == 'doctor' %}active{% endif %}">
-          <span style="font-size: 14px; opacity: 0.85;">🩺</span> Diagnostics
+          <span class="material-symbols-outlined" style="font-size: 18px;">health_and_safety</span>
+          <span>Diagnostics</span>
         </a>
       </nav>
 
@@ -58,7 +67,10 @@
         </div>
         <div class="header-actions">
           {% block header_actions %}
-            <a href="/goals/new" class="btn btn-primary btn-sm">+ New Goal</a>
+            <a href="/goals/new" class="btn btn-primary btn-sm">
+              <span class="material-symbols-outlined" style="font-size: 16px;">add</span>
+              <span>New Goal</span>
+            </a>
           {% endblock %}
         </div>
       </header>

@@ -18,10 +18,21 @@ function restoreActiveTab() {
   const pane = document.querySelector(`#${savedTab}`);
   if (btn && pane && !btn.disabled && !btn.hasAttribute('disabled')) {
     const parent = btn.closest('.tabs-container') || document;
-    parent.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    parent.querySelectorAll('.tab-btn').forEach(b => {
+      b.classList.remove('active');
+      if (b.hasAttribute('active')) b.removeAttribute('active');
+    });
     parent.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
     btn.classList.add('active');
+    btn.setAttribute('active', '');
     pane.classList.add('active');
+
+    const mdTabs = btn.closest('md-tabs');
+    if (mdTabs) {
+      const tabs = Array.from(mdTabs.querySelectorAll('md-primary-tab'));
+      const idx = tabs.indexOf(btn);
+      if (idx !== -1) mdTabs.activeTabIndex = idx;
+    }
   }
 }
 
@@ -34,14 +45,51 @@ document.addEventListener('click', (e) => {
   const targetId = btn.getAttribute('data-tab');
   if (!targetId) return;
 
-  parent.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  parent.querySelectorAll('.tab-btn').forEach(b => {
+    b.classList.remove('active');
+    if (b.hasAttribute('active')) b.removeAttribute('active');
+  });
   parent.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
 
   btn.classList.add('active');
+  btn.setAttribute('active', '');
   const pane = parent.querySelector(`#${targetId}`);
   if (pane) pane.classList.add('active');
 
+  const mdTabs = btn.closest('md-tabs');
+  if (mdTabs) {
+    const tabs = Array.from(mdTabs.querySelectorAll('md-primary-tab'));
+    const idx = tabs.indexOf(btn);
+    if (idx !== -1) mdTabs.activeTabIndex = idx;
+  }
+
   // Persist chosen tab across live HTMX fragment reloads
+  const goalId = getGoalId();
+  sessionStorage.setItem('activeGoalTab_' + goalId, targetId);
+});
+
+// Support md-tabs change event for keyboard arrow navigation & indicator sync
+document.addEventListener('change', (e) => {
+  const mdTabs = e.target.closest('md-tabs');
+  if (!mdTabs) return;
+  const tabs = Array.from(mdTabs.querySelectorAll('md-primary-tab'));
+  const activeTab = tabs[mdTabs.activeTabIndex];
+  if (!activeTab) return;
+  const targetId = activeTab.getAttribute('data-tab');
+  if (!targetId) return;
+
+  const parent = mdTabs.closest('.tabs-container') || document;
+  parent.querySelectorAll('.tab-btn').forEach(b => {
+    b.classList.remove('active');
+    if (b.hasAttribute('active')) b.removeAttribute('active');
+  });
+  parent.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+
+  activeTab.classList.add('active');
+  activeTab.setAttribute('active', '');
+  const pane = parent.querySelector(`#${targetId}`);
+  if (pane) pane.classList.add('active');
+
   const goalId = getGoalId();
   sessionStorage.setItem('activeGoalTab_' + goalId, targetId);
 });

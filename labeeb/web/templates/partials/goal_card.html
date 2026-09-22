@@ -10,9 +10,15 @@
     {% include "partials/stage_badge.html" %}
   </div>
 
-  <div style="display: flex; gap: 12px; font-size: 11.5px; color: var(--color-fog); font-family: var(--font-mono);">
-    <span>📁 {{ goal.repo | truncate(25) }}</span>
-    <span>🌿 {{ goal.branch | truncate(15) }}</span>
+  <div style="display: flex; gap: 14px; font-size: 11.5px; color: var(--color-fog); font-family: var(--font-mono); align-items: center;">
+    <span style="display: inline-flex; align-items: center; gap: 4px;">
+      <span class="material-symbols-outlined" style="font-size: 14px; color: var(--color-ash);">folder</span>
+      <span>{{ goal.repo | truncate(25) }}</span>
+    </span>
+    <span style="display: inline-flex; align-items: center; gap: 4px;">
+      <span class="material-symbols-outlined" style="font-size: 14px; color: var(--color-ash);">alt_route</span>
+      <span>{{ goal.branch | truncate(15) }}</span>
+    </span>
   </div>
 
   <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--color-graphite); padding-top: 10px; margin-top: 2px; font-size: 11.5px; color: var(--color-mist);">
