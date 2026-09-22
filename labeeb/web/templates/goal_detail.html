@@ -115,49 +115,11 @@
     </div>
   </div>
 
-  <!-- Visual Pipeline Progress Bar -->
-  <div class="pipeline-track">
-    <!-- Step 1: Contract -->
-    <div class="pipeline-step completed">
-      <div class="step-node">✓</div>
-      <div class="step-label">Contract</div>
-    </div>
-    <!-- Step 2: Audit -->
-    <div class="pipeline-step {% if goal.phase != 'CREATED' %}completed{% else %}active{% endif %}">
-      <div class="step-node">{% if goal.phase != 'CREATED' %}✓{% else %}2{% endif %}</div>
-      <div class="step-label">Audit</div>
-    </div>
-    <!-- Step 3: Plan -->
-    <div class="pipeline-step {% if goal.plan or goal.phase in ['PLAN_GATE', 'WAITING_JULES', 'REVIEWING', 'VALIDATING', 'PASS'] %}completed{% elif goal.phase == 'THINKING' %}active{% else %}pending{% endif %}">
-      <div class="step-node">{% if goal.plan %}✓{% else %}3{% endif %}</div>
-      <div class="step-label">Plan</div>
-    </div>
-    <!-- Step 4: Critique -->
-    <div class="pipeline-step {% if goal.pre_critic_done or goal.phase in ['PLAN_GATE', 'WAITING_JULES', 'REVIEWING', 'VALIDATING', 'PASS'] %}completed{% else %}pending{% endif %}">
-      <div class="step-node">4</div>
-      <div class="step-label">Critique</div>
-    </div>
-    <!-- Step 5: Gate -->
-    <div class="pipeline-step {% if goal.phase == 'PLAN_GATE' %}active{% elif goal.phase in ['WAITING_JULES', 'REVIEWING', 'VALIDATING', 'PASS'] %}completed{% else %}pending{% endif %}">
-      <div class="step-node">5</div>
-      <div class="step-label">Plan Gate</div>
-    </div>
-    <!-- Step 6: Jules Execution -->
-    <div class="pipeline-step {% if goal.phase == 'WAITING_JULES' %}active{% elif goal.phase in ['VALIDATING', 'REVIEWING', 'PASS'] %}completed{% else %}pending{% endif %}">
-      <div class="step-node">6</div>
-      <div class="step-label">Jules Worker</div>
-    </div>
-    <!-- Step 7: Validation -->
-    <div class="pipeline-step {% if goal.phase == 'VALIDATING' %}active{% elif goal.phase == 'PASS' %}completed{% else %}pending{% endif %}">
-      <div class="step-node">7</div>
-      <div class="step-label">Validation</div>
-    </div>
-    <!-- Step 8: Result -->
-    <div class="pipeline-step {% if goal.phase == 'PASS' %}completed{% elif goal.phase in ['FAIL', 'BLOCKED'] %}active{% else %}pending{% endif %}">
-      <div class="step-node">{% if goal.phase == 'PASS' %}✓{% elif goal.phase in ['FAIL', 'BLOCKED'] %}!{% else %}8{% endif %}</div>
-      <div class="step-label">Result</div>
-    </div>
-  </div>
+  <!-- 4-Stage Macro Loop Header -->
+  {% include "partials/macro_pipeline.html" %}
+
+  <!-- Brain Reasoning Activity Drawer -->
+  {% include "partials/reasoning_drawer.html" %}
 
   <!-- Human Decision Gate Callout -->
   <div id="decision-panel-slot">
@@ -187,6 +149,14 @@
       <button type="button" class="tab-btn" data-tab="tab-summary" id="tab-btn-summary" {% if goal.phase not in ['PASS', 'FAIL', 'BLOCKED'] %}disabled title="Session in progress. Available once complete."{% endif %}>
         <span class="material-symbols-outlined tab-icon tab-icon-summary">analytics</span>
         <span>Visual Summary &amp; Logs</span>
+      </button>
+      <button type="button" class="tab-btn" data-tab="tab-artifacts" id="tab-btn-artifacts">
+        <span class="material-symbols-outlined tab-icon" style="color: #38bdf8;">inventory_2</span>
+        <span>Artifacts Vault</span>
+      </button>
+      <button type="button" class="tab-btn" data-tab="tab-report" id="tab-btn-report" {% if not goal.final_report_md and goal.phase not in ['PASS', 'FAIL', 'BLOCKED'] %}disabled title="Final report available once goal completes."{% endif %}>
+        <span class="material-symbols-outlined tab-icon" style="color: #34d399;">article</span>
+        <span>Final Report</span>
       </button>
       <button type="button" class="tab-btn" data-tab="tab-raw" id="tab-btn-raw">
         <span class="material-symbols-outlined tab-icon tab-icon-raw">terminal</span>
@@ -653,6 +623,12 @@
         </div>
         <div id="raw-state-json" class="code-block" style="max-height: 480px;">{{ raw_state_json }}</div>
       </div>
+
+      <!-- Tab 7: Artifacts Vault -->
+      {% include "partials/tab_artifacts.html" %}
+
+      <!-- Tab 8: Final Executive Report -->
+      {% include "partials/tab_final_report.html" %}
     </div>
   </div>
 

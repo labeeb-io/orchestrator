@@ -1,0 +1,132 @@
+<!-- Tab: Artifacts Vault -->
+<div id="tab-artifacts" class="tab-pane">
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 8px;">
+    <div>
+      <h3 style="font-size: 14px; font-weight: 510; color: var(--color-paper); margin: 0;">Goal Artifacts Vault</h3>
+      <div style="font-size: 12px; color: var(--color-fog); margin-top: 3px;">
+        Immutable versioned documents produced by the Brain across the 16 reasoning activities.
+      </div>
+    </div>
+    <div>
+      <span class="badge badge-active" style="font-size: 11px;">
+        {{ (goal.artifacts or {})|length }} Artifacts Indexed
+      </span>
+    </div>
+  </div>
+
+  {% if goal.artifacts and (goal.artifacts|length > 0) %}
+    <div style="display: grid; grid-template-columns: 1fr; gap: 14px;">
+      <div class="card" style="padding: 0; overflow: hidden; border: 1px solid var(--color-graphite);">
+        <div style="overflow-x: auto;">
+          <table class="data-table" style="width: 100%; border-collapse: collapse; font-size: 12.5px;">
+            <thead>
+              <tr style="background: var(--color-carbon); border-bottom: 1px solid var(--color-graphite); text-align: left;">
+                <th style="padding: 10px 14px; color: var(--color-mist); font-weight: 510;">Artifact Type</th>
+                <th style="padding: 10px 14px; color: var(--color-mist); font-weight: 510;">Version</th>
+                <th style="padding: 10px 14px; color: var(--color-mist); font-weight: 510;">Validity</th>
+                <th style="padding: 10px 14px; color: var(--color-mist); font-weight: 510;">Status</th>
+                <th style="padding: 10px 14px; color: var(--color-mist); font-weight: 510;">SHA-256</th>
+                <th style="padding: 10px 14px; color: var(--color-mist); font-weight: 510;">Updated At</th>
+                <th style="padding: 10px 14px; color: var(--color-mist); font-weight: 510; text-align: right;">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for art_type, art in (goal.artifacts or {}).items() %}
+                <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.04); transition: background-color 0.15s ease;" class="artifact-row">
+                  <td style="padding: 10px 14px; font-weight: 500; color: var(--color-paper);">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                      <span class="material-symbols-outlined" style="font-size: 15px; color: #38bdf8;">description</span>
+                      <span style="font-family: var(--font-mono);">{{ art_type }}</span>
+                    </div>
+                  </td>
+                  <td style="padding: 10px 14px;">
+                    <span class="badge" style="background: rgba(255, 255, 255, 0.05); color: var(--color-fog); border: 1px solid var(--color-graphite); font-family: var(--font-mono); font-size: 11px;">
+                      v{{ art.version or 1 }}
+                    </span>
+                  </td>
+                  <td style="padding: 10px 14px;">
+                    {% if art.validity == 'VALID' %}
+                      <span class="badge badge-active" style="font-size: 11px; background: rgba(39, 166, 68, 0.15); color: #4ade80; border-color: rgba(39, 166, 68, 0.3);">
+                        VALID
+                      </span>
+                    {% else %}
+                      <span class="badge badge-warn" style="font-size: 11px;">
+                        STALE
+                      </span>
+                    {% endif %}
+                  </td>
+                  <td style="padding: 10px 14px;">
+                    {% if art.status == 'SATISFIED' %}
+                      <span style="color: #4ade80; font-size: 12px; display: inline-flex; align-items: center; gap: 4px;">
+                        <span class="material-symbols-outlined" style="font-size: 14px;">check</span> Satisfied
+                      </span>
+                    {% elif art.status == 'NOT_APPLICABLE' %}
+                      <span style="color: var(--color-ash); font-size: 12px; display: inline-flex; align-items: center; gap: 4px;">
+                        <span class="material-symbols-outlined" style="font-size: 14px;">remove</span> N/A
+                      </span>
+                    {% else %}
+                      <span style="color: #fbbf24; font-size: 12px;">{{ art.status or 'Recorded' }}</span>
+                    {% endif %}
+                  </td>
+                  <td style="padding: 10px 14px; font-family: var(--font-mono); font-size: 11.5px; color: var(--color-fog);">
+                    {{ (art.sha256 or '—')[:10] }}
+                  </td>
+                  <td style="padding: 10px 14px; font-size: 11.5px; color: var(--color-fog);">
+                    {{ str(art.updated_at)[11:19] if art.updated_at else '—' }}
+                  </td>
+                  <td style="padding: 10px 14px; text-align: right;">
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="fetchArtifactData('{{ goal.goal_id }}', '{{ art_type }}')" style="font-size: 11.5px; padding: 3px 9px;">
+                      Inspect JSON
+                    </button>
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Live JSON Inspector Viewport -->
+      <div id="artifact-inspector-card" class="card" style="display: none; padding: 16px; border: 1px solid var(--color-graphite);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span class="material-symbols-outlined" style="font-size: 16px; color: #38bdf8;">code</span>
+            <strong id="artifact-inspector-title" style="font-size: 13px; color: var(--color-paper); font-family: var(--font-mono);"></strong>
+          </div>
+          <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('artifact-inspector-card').style.display='none'" style="font-size: 11px;">
+            Close
+          </button>
+        </div>
+        <pre id="artifact-inspector-content" class="code-block" style="max-height: 400px; overflow-y: auto; margin: 0;"></pre>
+      </div>
+    </div>
+  {% else %}
+    <div class="card" style="text-align: center; padding: 32px 20px; color: var(--color-fog);">
+      <span class="material-symbols-outlined" style="font-size: 32px; opacity: 0.5; margin-bottom: 8px;">inventory_2</span>
+      <div>No reasoning artifacts recorded for this goal yet.</div>
+      <div style="font-size: 12px; color: var(--color-ash); margin-top: 4px;">Artifacts will appear as the Brain advances through each reasoning activity.</div>
+    </div>
+  {% endif %}
+</div>
+
+<script>
+function fetchArtifactData(goalId, artType) {
+  const card = document.getElementById('artifact-inspector-card');
+  const title = document.getElementById('artifact-inspector-title');
+  const content = document.getElementById('artifact-inspector-content');
+  if (!card || !content) return;
+
+  title.innerText = 'Artifact: ' + artType;
+  content.innerText = 'Loading artifact payload...';
+  card.style.display = 'block';
+
+  fetch('/api/goals/' + goalId + '/artifacts/' + artType)
+    .then(res => res.json())
+    .then(data => {
+      content.innerText = JSON.stringify(data, null, 2);
+    })
+    .catch(err => {
+      content.innerText = 'Failed to load artifact: ' + err;
+    });
+}
+</script>

@@ -1,0 +1,108 @@
+<!-- 4-Stage Macro Loop Pipeline Track -->
+<div class="macro-pipeline-card" style="margin-bottom: 20px; background: var(--color-obsidian); border: 1px solid var(--color-graphite); border-radius: var(--radius-card); padding: 16px 20px;">
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
+    <div style="display: flex; align-items: center; gap: 8px;">
+      <span class="material-symbols-outlined" style="font-size: 16px; color: var(--color-mist);">sync_alt</span>
+      <span style="font-size: 12px; font-weight: 590; text-transform: uppercase; letter-spacing: 0.05em; color: var(--color-mist);">Macro Loop Control Plane</span>
+      {% if goal.execution_rounds and goal.execution_rounds > 1 and goal.macro_phase == 'THINKING' %}
+        <span class="badge badge-warn" style="font-size: 11px; display: inline-flex; align-items: center; gap: 4px;">
+          <span class="material-symbols-outlined" style="font-size: 13px;">replay</span>
+          <span>Backtracked from PROVE (Round {{ goal.execution_rounds }}/2)</span>
+        </span>
+      {% endif %}
+      {% if goal.baseline_shortcut %}
+        <span class="badge badge-active" style="font-size: 11px; display: inline-flex; align-items: center; gap: 4px; background: rgba(56, 189, 248, 0.1); color: #38bdf8; border-color: rgba(56, 189, 248, 0.3);">
+          <span class="material-symbols-outlined" style="font-size: 13px;">bolt</span>
+          <span>Baseline Shortcut (Zero Mutations)</span>
+        </span>
+      {% endif %}
+    </div>
+    <div style="font-size: 11.5px; color: var(--color-fog); font-family: var(--font-mono);">
+      Phase: <strong style="color: var(--color-paper);">{{ goal.macro_phase or 'THINKING' }}</strong>
+    </div>
+  </div>
+
+  <div class="macro-pipeline-track">
+    <!-- Macro Stage 1: THINK / CONVERGE -->
+    {% set is_think_active = (goal.macro_phase == 'THINKING' or goal.phase in ['THINKING', 'PLAN_GATE', 'CREATED']) and goal.phase not in ['PASS', 'FAIL', 'BLOCKED'] %}
+    {% set is_think_completed = goal.macro_phase in ['EXECUTE', 'PROVE', 'REPORTING'] or goal.phase in ['WAITING_JULES', 'VALIDATING', 'REVIEWING', 'PASS', 'FAIL', 'BLOCKED'] %}
+    <div class="macro-step {% if is_think_active %}active{% elif is_think_completed %}completed{% else %}pending{% endif %}">
+      <div class="macro-step-icon">
+        {% if is_think_completed and not is_think_active %}✓{% else %}<span class="material-symbols-outlined" style="font-size: 14px;">psychology</span>{% endif %}
+      </div>
+      <div class="macro-step-content">
+        <div class="macro-step-title">1. THINK / CONVERGE</div>
+        <div class="macro-step-subtitle">16-Activity Reasoning Graph</div>
+      </div>
+    </div>
+
+    <div class="macro-step-arrow {% if is_think_completed %}completed{% endif %}">→</div>
+
+    <!-- Macro Stage 2: EXECUTE -->
+    {% set is_exec_active = (goal.macro_phase == 'EXECUTE' or goal.phase in ['WAITING_JULES', 'EFFECT']) and goal.phase not in ['PASS', 'FAIL', 'BLOCKED'] %}
+    {% set is_exec_completed = goal.macro_phase in ['PROVE', 'REPORTING'] or goal.phase in ['VALIDATING', 'REVIEWING', 'PASS'] %}
+    <div class="macro-step {% if is_exec_active %}active{% elif is_exec_completed %}completed{% else %}pending{% endif %}">
+      <div class="macro-step-icon">
+        {% if is_exec_completed and not is_exec_active %}✓{% else %}<span class="material-symbols-outlined" style="font-size: 14px;">terminal</span>{% endif %}
+      </div>
+      <div class="macro-step-content">
+        <div class="macro-step-title">2. EXECUTE</div>
+        <div class="macro-step-subtitle">Jules Isolated Workspace</div>
+      </div>
+    </div>
+
+    <div class="macro-step-arrow {% if is_exec_completed %}completed{% endif %}">→</div>
+
+    <!-- Macro Stage 3: PROVE -->
+    {% set is_prove_active = (goal.macro_phase == 'PROVE' or goal.phase in ['VALIDATING', 'REVIEWING']) and goal.phase not in ['PASS', 'FAIL', 'BLOCKED'] %}
+    {% set is_prove_completed = goal.macro_phase == 'REPORTING' or goal.phase == 'PASS' %}
+    <div class="macro-step {% if is_prove_active %}active{% elif is_prove_completed %}completed{% else %}pending{% endif %}">
+      <div class="macro-step-icon">
+        {% if is_prove_completed and not is_prove_active %}✓{% else %}<span class="material-symbols-outlined" style="font-size: 14px;">fact_check</span>{% endif %}
+      </div>
+      <div class="macro-step-content">
+        <div class="macro-step-title">3. PROVE</div>
+        <div class="macro-step-subtitle">Deterministic Worktree Verification</div>
+      </div>
+    </div>
+
+    <div class="macro-step-arrow {% if is_prove_completed %}completed{% endif %}">→</div>
+
+    <!-- Macro Stage 4: REPORTING -->
+    {% set is_rep_active = goal.macro_phase == 'REPORTING' and goal.phase not in ['PASS', 'FAIL', 'BLOCKED'] %}
+    {% set is_rep_completed = goal.phase in ['PASS', 'FAIL', 'BLOCKED'] %}
+    <div class="macro-step {% if is_rep_active %}active{% elif is_rep_completed %}completed{% else %}pending{% endif %}">
+      <div class="macro-step-icon">
+        {% if is_rep_completed %}✓{% else %}<span class="material-symbols-outlined" style="font-size: 14px;">summarize</span>{% endif %}
+      </div>
+      <div class="macro-step-content">
+        <div class="macro-step-title">4. REPORTING</div>
+        <div class="macro-step-subtitle">Obsidian Markdown &amp; JSON</div>
+      </div>
+    </div>
+
+    <div class="macro-step-arrow {% if is_rep_completed %}completed{% endif %}">→</div>
+
+    <!-- Terminal Verdict -->
+    <div class="macro-step {% if goal.phase == 'PASS' %}verdict-pass{% elif goal.phase in ['FAIL', 'BLOCKED'] %}verdict-fail{% else %}pending{% endif %}">
+      <div class="macro-step-icon">
+        {% if goal.phase == 'PASS' %}
+          <span class="material-symbols-outlined" style="font-size: 15px; color: #34d399;">check_circle</span>
+        {% elif goal.phase in ['FAIL', 'BLOCKED'] %}
+          <span class="material-symbols-outlined" style="font-size: 15px; color: #f87171;">error</span>
+        {% else %}
+          <span class="material-symbols-outlined" style="font-size: 14px;">pending</span>
+        {% endif %}
+      </div>
+      <div class="macro-step-content">
+        <div class="macro-step-title">{{ goal.phase if goal.phase in ['PASS', 'FAIL', 'BLOCKED'] else 'VERDICT' }}</div>
+        <div class="macro-step-subtitle">
+          {% if goal.phase == 'PASS' %}Criteria Verified
+          {% elif goal.phase == 'FAIL' %}Failed / Exhausted
+          {% elif goal.phase == 'BLOCKED' %}Human Gate Required
+          {% else %}Awaiting Result{% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,161 @@
+<!-- Brain Reasoning Activity Drawer -->
+<div class="card" style="margin-bottom: 20px; padding: 0; overflow: hidden; border: 1px solid var(--color-graphite);">
+  <md-elevation></md-elevation>
+  <div style="padding: 14px 20px; background: var(--color-carbon); display: flex; justify-content: space-between; align-items: center; cursor: pointer; border-bottom: 1px solid var(--color-graphite);" onclick="toggleReasoningDrawer()">
+    <div style="display: flex; align-items: center; gap: 10px;">
+      <span class="material-symbols-outlined" style="font-size: 18px; color: #a78bfa;">psychology</span>
+      <div>
+        <span style="font-size: 13.5px; font-weight: 590; color: var(--color-paper); letter-spacing: -0.01em;">
+          Reasoning Graph &amp; Activity Trajectory
+        </span>
+        <span style="font-size: 12px; color: var(--color-fog); margin-left: 8px;">
+          (16 fine-grained reasoning activities)
+        </span>
+      </div>
+    </div>
+    <div style="display: flex; align-items: center; gap: 12px;">
+      {% if goal.current_activity %}
+        <span class="badge badge-active" style="font-size: 11px; background: rgba(167, 139, 250, 0.15); color: #c4b5fd; border-color: rgba(167, 139, 250, 0.3);">
+          Current: <strong>{{ goal.current_activity }}</strong>
+        </span>
+      {% endif %}
+      <span class="material-symbols-outlined" id="reasoning-drawer-chevron" style="font-size: 20px; color: var(--color-mist); transition: transform 0.2s ease;">
+        expand_more
+      </span>
+    </div>
+  </div>
+
+  <div id="reasoning-drawer-body" style="padding: 18px 20px; background: var(--color-obsidian); display: block;">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px;">
+      <!-- Category 1: Contracts -->
+      <div class="reasoning-category-group">
+        <div class="category-header">
+          <span class="material-symbols-outlined category-icon" style="color: #38bdf8;">gavel</span>
+          <span>1. Contracts</span>
+        </div>
+        <div class="activity-chips-list">
+          {% for act_id, act_name in [('authority_context', 'Authority Context'), ('goal_contract', 'Goal Contract'), ('product_validation', 'Product Validation'), ('proof_contract', 'Proof Contract')] %}
+            {% set art = (goal.artifacts or {}).get(act_id) %}
+            {% set is_active = (goal.current_activity == act_id and goal.phase not in ['PASS', 'FAIL', 'BLOCKED']) %}
+            {% set is_stale = (art and art.validity == 'STALE') %}
+            {% set is_na = (art and art.status == 'NOT_APPLICABLE') %}
+            {% set is_satisfied = (art and art.validity == 'VALID' and not is_na) %}
+            <div class="activity-chip {% if is_active %}active{% elif is_stale %}stale{% elif is_satisfied %}satisfied{% elif is_na %}na{% else %}pending{% endif %}">
+              <span class="chip-status-icon">
+                {% if is_active %}●{% elif is_stale %}⚠️{% elif is_satisfied %}✓{% elif is_na %}—{% else %}○{% endif %}
+              </span>
+              <span class="chip-label">{{ act_name }}</span>
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <!-- Category 2: Audits & Reality -->
+      <div class="reasoning-category-group">
+        <div class="category-header">
+          <span class="material-symbols-outlined category-icon" style="color: #a78bfa;">visibility</span>
+          <span>2. Audits &amp; Reality</span>
+        </div>
+        <div class="activity-chips-list">
+          {% for act_id, act_name, art_key in [('reality_audit', 'Reality Audit', 'reality_audit'), ('mutation_preflight', 'Mutation Preflight', 'mutation_preflight'), ('baseline', 'Baseline Validation', 'baseline_result')] %}
+            {% set art = (goal.artifacts or {}).get(art_key) or (goal.artifacts or {}).get(act_id) %}
+            {% set is_active = (goal.current_activity == act_id and goal.phase not in ['PASS', 'FAIL', 'BLOCKED']) %}
+            {% set is_stale = (art and art.validity == 'STALE') %}
+            {% set is_na = (art and art.status == 'NOT_APPLICABLE') %}
+            {% set is_satisfied = (art and art.validity == 'VALID' and not is_na) %}
+            <div class="activity-chip {% if is_active %}active{% elif is_stale %}stale{% elif is_satisfied %}satisfied{% elif is_na %}na{% else %}pending{% endif %}">
+              <span class="chip-status-icon">
+                {% if is_active %}●{% elif is_stale %}⚠️{% elif is_satisfied %}✓{% elif is_na %}—{% else %}○{% endif %}
+              </span>
+              <span class="chip-label">{{ act_name }}</span>
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <!-- Category 3: Solutions -->
+      <div class="reasoning-category-group">
+        <div class="category-header">
+          <span class="material-symbols-outlined category-icon" style="color: #fbbf24;">lightbulb</span>
+          <span>3. Solutions</span>
+        </div>
+        <div class="activity-chips-list">
+          {% for act_id, act_name, art_key in [('diagnosis', 'Defect Diagnosis', 'diagnosis'), ('solution_exploration', 'Solution Candidates', 'solution_candidates'), ('second_reality_audit', 'Second Audit', 'second_audit')] %}
+            {% set art = (goal.artifacts or {}).get(art_key) or (goal.artifacts or {}).get(act_id) %}
+            {% set is_active = (goal.current_activity == act_id and goal.phase not in ['PASS', 'FAIL', 'BLOCKED']) %}
+            {% set is_stale = (art and art.validity == 'STALE') %}
+            {% set is_na = (art and art.status == 'NOT_APPLICABLE') %}
+            {% set is_satisfied = (art and art.validity == 'VALID' and not is_na) %}
+            <div class="activity-chip {% if is_active %}active{% elif is_stale %}stale{% elif is_satisfied %}satisfied{% elif is_na %}na{% else %}pending{% endif %}">
+              <span class="chip-status-icon">
+                {% if is_active %}●{% elif is_stale %}⚠️{% elif is_satisfied %}✓{% elif is_na %}—{% else %}○{% endif %}
+              </span>
+              <span class="chip-label">{{ act_name }}</span>
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <!-- Category 4: Critique & Convergence -->
+      <div class="reasoning-category-group">
+        <div class="category-header">
+          <span class="material-symbols-outlined category-icon" style="color: #f87171;">security</span>
+          <span>4. Adversarial Review</span>
+        </div>
+        <div class="activity-chips-list">
+          {% for act_id, act_name, art_key in [('delivery_readiness', 'Delivery Review', 'delivery_review'), ('independent_critique', 'Claude Critic', 'critic_review'), ('convergence', 'Convergence', 'convergence')] %}
+            {% set art = (goal.artifacts or {}).get(art_key) or (goal.artifacts or {}).get(act_id) %}
+            {% set is_active = (goal.current_activity == act_id and goal.phase not in ['PASS', 'FAIL', 'BLOCKED']) %}
+            {% set is_stale = (art and art.validity == 'STALE') %}
+            {% set is_na = (art and art.status == 'NOT_APPLICABLE') %}
+            {% set is_satisfied = (art and art.validity == 'VALID' and not is_na) %}
+            <div class="activity-chip {% if is_active %}active{% elif is_stale %}stale{% elif is_satisfied %}satisfied{% elif is_na %}na{% else %}pending{% endif %}">
+              <span class="chip-status-icon">
+                {% if is_active %}●{% elif is_stale %}⚠️{% elif is_satisfied %}✓{% elif is_na %}—{% else %}○{% endif %}
+              </span>
+              <span class="chip-label">{{ act_name }}</span>
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <!-- Category 5: Gates & Contracts -->
+      <div class="reasoning-category-group">
+        <div class="category-header">
+          <span class="material-symbols-outlined category-icon" style="color: #34d399;">verified_user</span>
+          <span>5. Execution Gates</span>
+        </div>
+        <div class="activity-chips-list">
+          {% for act_id, act_name in [('change_authority', 'Change Authority'), ('implementation_readiness', 'Readiness Gate'), ('execution_contract', 'Execution Contract')] %}
+            {% set art = (goal.artifacts or {}).get(act_id) %}
+            {% set is_active = (goal.current_activity == act_id and goal.phase not in ['PASS', 'FAIL', 'BLOCKED']) %}
+            {% set is_stale = (art and art.validity == 'STALE') %}
+            {% set is_na = (art and art.status == 'NOT_APPLICABLE') %}
+            {% set is_satisfied = (art and art.validity == 'VALID' and not is_na) %}
+            <div class="activity-chip {% if is_active %}active{% elif is_stale %}stale{% elif is_satisfied %}satisfied{% elif is_na %}na{% else %}pending{% endif %}">
+              <span class="chip-status-icon">
+                {% if is_active %}●{% elif is_stale %}⚠️{% elif is_satisfied %}✓{% elif is_na %}—{% else %}○{% endif %}
+              </span>
+              <span class="chip-label">{{ act_name }}</span>
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function toggleReasoningDrawer() {
+  const body = document.getElementById('reasoning-drawer-body');
+  const chevron = document.getElementById('reasoning-drawer-chevron');
+  if (!body || !chevron) return;
+  if (body.style.display === 'none') {
+    body.style.display = 'block';
+    chevron.style.transform = 'rotate(0deg)';
+  } else {
+    body.style.display = 'none';
+    chevron.style.transform = 'rotate(-90deg)';
+  }
+}
+</script>

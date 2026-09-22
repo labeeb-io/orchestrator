@@ -1,0 +1,55 @@
+<!-- Tab: Final Executive Report -->
+<div id="tab-report" class="tab-pane">
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 8px;">
+    <div>
+      <h3 style="font-size: 14px; font-weight: 510; color: var(--color-paper); margin: 0;">Deterministic Final Report</h3>
+      <div style="font-size: 12px; color: var(--color-fog); margin-top: 3px;">
+        Obsidian-compatible report with executive metrics, verified acceptance criteria, and validation logs.
+      </div>
+    </div>
+    <div style="display: flex; gap: 8px; align-items: center;">
+      {% if goal.final_report_md %}
+        <button type="button" class="btn btn-secondary btn-sm" onclick="copyReportMarkdown()" style="display: inline-flex; align-items: center; gap: 5px;">
+          <span class="material-symbols-outlined" style="font-size: 14px;">content_copy</span>
+          <span id="copy-report-btn-text">Copy Markdown</span>
+        </button>
+        <a href="/api/goals/{{ goal.goal_id }}/report" target="_blank" class="btn btn-secondary btn-sm" style="display: inline-flex; align-items: center; gap: 5px;">
+          <span class="material-symbols-outlined" style="font-size: 14px;">download</span>
+          <span>Raw Report API</span>
+        </a>
+      {% endif %}
+    </div>
+  </div>
+
+  {% if goal.final_report_md %}
+    <div class="card" style="padding: 24px; border: 1px solid var(--color-graphite); background: var(--color-obsidian); border-radius: var(--radius-card);">
+      <div class="final-report-markdown-view" style="font-family: var(--font-sans); color: var(--color-paper); line-height: 1.65; white-space: pre-wrap; word-break: break-word; font-size: 13.5px;" id="final-report-raw-text">{{ goal.final_report_md }}</div>
+    </div>
+  {% elif goal.final_report %}
+    <div class="card" style="padding: 20px; border: 1px solid var(--color-graphite); background: var(--color-obsidian);">
+      <pre class="code-block" style="max-height: 500px; margin: 0;">{{ goal.final_report | tojson(indent=2) }}</pre>
+    </div>
+  {% else %}
+    <div class="card" style="text-align: center; padding: 40px 20px; color: var(--color-fog);">
+      <span class="material-symbols-outlined" style="font-size: 36px; opacity: 0.5; margin-bottom: 8px; color: #34d399;">article</span>
+      <div style="font-size: 14px; font-weight: 500; color: var(--color-paper);">Final Report Not Ready Yet</div>
+      <div style="font-size: 12px; color: var(--color-ash); margin-top: 4px; max-width: 480px; margin-left: auto; margin-right: auto;">
+        The deterministic final report is compiled during the <strong>REPORTING</strong> phase right before reaching a terminal verdict (PASS, FAIL, or BLOCKED).
+      </div>
+    </div>
+  {% endif %}
+</div>
+
+<script>
+function copyReportMarkdown() {
+  const el = document.getElementById('final-report-raw-text');
+  const btnText = document.getElementById('copy-report-btn-text');
+  if (!el) return;
+  navigator.clipboard.writeText(el.innerText || el.textContent).then(() => {
+    if (btnText) {
+      btnText.innerText = 'Copied!';
+      setTimeout(() => { btnText.innerText = 'Copy Markdown'; }, 2000);
+    }
+  });
+}
+</script>

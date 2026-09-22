@@ -218,3 +218,60 @@ async def get_goal_logs(goal_id: str, request: Request):
         "background_log": bg_log.read_text(encoding="utf-8", errors="replace") if bg_log.exists() else "",
         "controller_log": ctrl_log.read_text(encoding="utf-8", errors="replace") if ctrl_log.exists() else "",
     }
+
+
+@router.get("/{goal_id}/artifacts")
+async def list_artifacts(goal_id: str, request: Request):
+    """Retrieve all indexed reasoning artifacts for a goal."""
+    config: Config = request.app.state.config
+    ctl = LabeebController(config, goal_id)
+    if not ctl.paths.state.exists():
+        raise HTTPException(status_code=404, detail=f"Goal {goal_id} not found")
+    status = ctl.status()
+    return {
+        "goal_id": goal_id,
+        "artifacts": status.get("artifacts", {}),
+    }
+
+
+@router.get("/{goal_id}/artifacts/{artifact_type}")
+async def get_artifact(goal_id: str, artifact_type: str, request: Request):
+    """Retrieve specific artifact payload by type (latest valid or recorded version)."""
+    config: Config = request.app.state.config
+    ctl = LabeebController(config, goal_id)
+    if not ctl.paths.state.exists():
+        raise HTTPException(status_code=404, detail=f"Goal {goal_id} not found")
+    status = ctl.status()
+    art_meta = (status.get("artifacts") or {}).get(artifact_type)
+    if isinstance(art_meta, dict) and art_meta.get("ref"):
+        with contextlib.suppress(Exception):
+            return read_ref_json(art_meta["ref"])
+    if ctl.paths.artifacts.exists():
+        for p in sorted(ctl.paths.artifacts.glob(f"{artifact_type}.v*.json"), reverse=True):
+            import json
+            with contextlib.suppress(Exception):
+                return json.loads(p.read_text(encoding="utf-8"))
+    raise HTTPException(status_code=404, detail=f"Artifact '{artifact_type}' not found for goal {goal_id}")
+
+
+@router.get("/{goal_id}/report")
+async def get_report(goal_id: str, request: Request):
+    """Retrieve final report markdown and JSON."""
+    config: Config = request.app.state.config
+    ctl = LabeebController(config, goal_id)
+    if not ctl.paths.state.exists():
+        raise HTTPException(status_code=404, detail=f"Goal {goal_id} not found")
+    status = ctl.status()
+    md_text = ctl.paths.final_report_md.read_text(encoding="utf-8") if ctl.paths.final_report_md.exists() else ""
+    report_json = status.get("final_report")
+    if not report_json and ctl.paths.final_report_json.exists():
+        import json
+        with contextlib.suppress(Exception):
+            report_json = json.loads(ctl.paths.final_report_json.read_text(encoding="utf-8"))
+    return {
+        "goal_id": goal_id,
+        "status": status.get("phase"),
+        "macro_phase": status.get("macro_phase"),
+        "markdown": md_text,
+        "report": report_json,
+    }

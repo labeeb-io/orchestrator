@@ -1855,3 +1855,191 @@ body {
 .inspector-json-details summary:hover {
   color: var(--color-paper);
 }
+
+/* ==========================================================================
+   Macro Loop Control Plane & Reasoning Activity Drawer Styles
+   ========================================================================== */
+
+.macro-pipeline-track {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 4px 0;
+}
+
+.macro-step {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--color-carbon);
+  border: 1px solid var(--color-graphite);
+  border-radius: var(--radius-card);
+  padding: 8px 14px;
+  flex: 1;
+  min-width: 140px;
+  transition: all 0.2s ease;
+}
+
+.macro-step.active {
+  border-color: #38bdf8;
+  background: rgba(56, 189, 248, 0.08);
+  box-shadow: 0 0 12px rgba(56, 189, 248, 0.15);
+}
+
+.macro-step.completed {
+  border-color: rgba(52, 211, 153, 0.4);
+  background: rgba(52, 211, 153, 0.05);
+}
+
+.macro-step.verdict-pass {
+  border-color: #34d399;
+  background: rgba(52, 211, 153, 0.1);
+}
+
+.macro-step.verdict-fail {
+  border-color: #f87171;
+  background: rgba(248, 113, 113, 0.1);
+}
+
+.macro-step-icon {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--color-fog);
+  font-size: 12px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.macro-step.active .macro-step-icon {
+  background: rgba(56, 189, 248, 0.2);
+  color: #38bdf8;
+  animation: pulse-ring 2s infinite;
+}
+
+.macro-step.completed .macro-step-icon {
+  background: rgba(52, 211, 153, 0.2);
+  color: #34d399;
+}
+
+.macro-step-content {
+  min-width: 0;
+}
+
+.macro-step-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-paper);
+  white-space: nowrap;
+  letter-spacing: -0.01em;
+}
+
+.macro-step-subtitle {
+  font-size: 10.5px;
+  color: var(--color-fog);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.macro-step-arrow {
+  color: var(--color-ash);
+  font-size: 14px;
+  font-weight: bold;
+  user-select: none;
+  flex-shrink: 0;
+}
+
+.macro-step-arrow.completed {
+  color: #34d399;
+}
+
+/* Activity Drawer & Chips */
+.reasoning-category-group {
+  background: var(--color-carbon);
+  border: 1px solid var(--color-graphite);
+  border-radius: 6px;
+  padding: 10px 12px;
+}
+
+.category-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-paper);
+  margin-bottom: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  padding-bottom: 6px;
+}
+
+.category-icon {
+  font-size: 15px !important;
+}
+
+.activity-chips-list {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.activity-chip {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 11.5px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid transparent;
+  transition: all 0.15s ease;
+}
+
+.activity-chip.active {
+  background: rgba(56, 189, 248, 0.12);
+  border-color: rgba(56, 189, 248, 0.4);
+  color: #38bdf8;
+  font-weight: 550;
+}
+
+.activity-chip.satisfied {
+  color: #4ade80;
+}
+
+.activity-chip.stale {
+  background: rgba(245, 158, 11, 0.1);
+  border-color: rgba(245, 158, 11, 0.3);
+  color: #fbbf24;
+}
+
+.activity-chip.na {
+  color: var(--color-ash);
+  opacity: 0.7;
+}
+
+.activity-chip.pending {
+  color: var(--color-fog);
+  opacity: 0.55;
+}
+
+.chip-status-icon {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  width: 14px;
+  text-align: center;
+}
+
+.chip-label {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
