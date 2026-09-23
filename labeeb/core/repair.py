@@ -53,8 +53,14 @@ def reserve_and_send_repair(ctl: LabeebController, state: dict[str, Any], messag
     state["repair_reserved"] = True
     state["execution_rounds"] = current_rounds + 1
     state["round_anchor_ref"] = anchor_ref
-    ctl.store.save(state)
-    repair_text = textwrap.dedent(
+    state["materialization_verified"] = False
+    state.pop("materialization_anchor_ref", None)
+    contract = read_ref_json(state["contract_ref"])
+    plan = read_ref_json(state["plan_ref"])
+    execution = plan.get("execution") or {}
+    from labeeb.core.prompts import compose_jules_implementation_prompt
+
+    repair_body = textwrap.dedent(
         f"""
         {marker}
         Targeted correction only. Do not widen scope, push, create PRs, merge, or mutate production.
@@ -64,6 +70,11 @@ def reserve_and_send_repair(ctl: LabeebController, state: dict[str, Any], messag
         {marker}
         """
     ).strip()
+    repair_text = compose_jules_implementation_prompt(
+        repair_body,
+        allowed_paths=list(execution.get("allowed_paths") or contract.get("allowed_paths") or []),
+        validation_commands=list(execution.get("validation_commands") or contract.get("validation_commands") or []),
+    )
     repair_request_ref = ctl.store.write_text(ctl.paths.requests / f"{op_id}.repair.txt", repair_text)
     state["repair_request_ref"] = repair_request_ref
     ctl.store.save(state)
@@ -129,7 +140,7 @@ def dispatch_repair_fallback_session(ctl: LabeebController, state: dict[str, Any
     op_id = new_operation_id("jules-repair-fallback")
     marker = safe_name(f"LABEEB-{ctl.goal_id}-REPAIR-FALLBACK-{op_id}", 120)
     original = str((plan.get("execution") or {}).get("jules_prompt") or "")
-    prompt = textwrap.dedent(
+    repair_body = textwrap.dedent(
         f"""
         This is a replacement Jules session because continuity of the completed session could not be proven.
         Re-implement the bounded original task from the configured base branch, applying the targeted correction below.
@@ -139,10 +150,22 @@ def dispatch_repair_fallback_session(ctl: LabeebController, state: dict[str, Any
 
         TARGETED CORRECTION:
         {repair_message}
-
-        Remote-write boundary: no push, no PR creation, no merge, no production mutation, no remote ref changes.
         """
     ).strip()
+
+    from labeeb.core.prompts import compose_jules_implementation_prompt
+
+    execution = plan.get("execution") or {}
+    allowed = list(execution.get("allowed_paths") or contract.get("allowed_paths") or [])
+    validation = list(execution.get("validation_commands") or contract.get("validation_commands") or [])
+
+    prompt = compose_jules_implementation_prompt(
+        execution_prompt=repair_body,
+        allowed_paths=allowed,
+        validation_commands=validation,
+    )
+    state["materialization_verified"] = False
+    state.pop("materialization_anchor_ref", None)
     anchor = {
         "activity_keys": [],
         "repair_marker": "",

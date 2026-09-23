@@ -65,6 +65,12 @@ allow_pr = false
 allow_merge = false
 allow_production_mutation = false
 
+[implementation]
+require_materialized_changes = true
+max_materialization_corrections = 1
+pause_after_implementation = false
+
+
 # These actions are customizable, but the controller still enforces its safety
 # invariants (single writer, no blind write retry, one repair, no remote publish).
 # Allowed action values: wait | wake | review | block

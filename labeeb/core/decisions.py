@@ -5,6 +5,7 @@ review decisions, critic reviews, and dispatching operations from LabeebControll
 """
 from __future__ import annotations
 
+import re
 from typing import TYPE_CHECKING, Any
 
 from labeeb.config import critic_needed
@@ -231,12 +232,27 @@ def handle_reasoning_decision(ctl: LabeebController, state: dict[str, Any], deci
     ctl.block(state, f"Unhandled reasoning action: {action}", evidence=decision)
 
 
+def _sanitize_direct_prompt(prompt_str: str) -> str:
+    """Sanitize phrases in Brain prompts that encourage textual/diff-only responses."""
+    text = prompt_str.strip()
+    replacements = [
+        (re.compile(r"Produce a unified patch containing only", re.IGNORECASE), "Create or modify the following file(s) in the repository working tree:"),
+        (re.compile(r"Produce a unified patch\b", re.IGNORECASE), "Create or modify the authorized file(s) in the repository working tree"),
+        (re.compile(r"Produce a patch\b", re.IGNORECASE), "Create or modify the authorized file(s) in the repository working tree"),
+        (re.compile(r"Return a patch\b", re.IGNORECASE), "Materialize the changes in the repository working tree"),
+        (re.compile(r"Output the following file\b", re.IGNORECASE), "Create or modify the following file in the repository working tree"),
+    ]
+    for pattern, repl in replacements:
+        text = pattern.sub(repl, text)
+    return text
+
+
 def build_jules_prompt(
     execution: dict[str, Any],
     produced_data: dict[str, Any],
     plan_summary: str = "",
 ) -> str:
-    """Extract or synthesize a complete Jules prompt from execution or artifact data."""
+    """Extract or synthesize a complete Jules prompt from execution or artifact data, emphasizing working-tree mutation."""
     direct = (
         execution.get("jules_prompt")
         or execution.get("prompt")
@@ -244,7 +260,7 @@ def build_jules_prompt(
         or produced_data.get("prompt")
     )
     if direct and str(direct).strip():
-        return str(direct).strip()
+        return _sanitize_direct_prompt(str(direct))
 
     # Synthesize from structured execution_contract artifact fields
     sections: list[str] = []
@@ -263,9 +279,18 @@ def build_jules_prompt(
         elif isinstance(impl, str) and impl.strip():
             sections.append(f"Implementation:\n{impl.strip()}")
 
-    expected = produced_data.get("expected_worker_output")
-    if expected:
-        sections.append(f"Expected Output:\n{expected}")
+    new_files = produced_data.get("new_files") or []
+    modified_files = produced_data.get("modified_files") or []
+    expected = produced_data.get("expected_worker_output") or produced_data.get("expected_output")
+
+    if new_files and isinstance(new_files, list):
+        sections.append("Required Materialized File(s):\n" + "\n".join(f"- {f}" for f in new_files))
+    if modified_files and isinstance(modified_files, list):
+        sections.append("Required Working-Tree Modifications:\n" + "\n".join(f"- {f}" for f in modified_files))
+    if expected and not (new_files or modified_files):
+        sections.append(f"Required Working-Tree Changes:\n{expected}\nThe actual repository change is the required output.")
+    elif not (new_files or modified_files):
+        sections.append("Required Action:\nCreate or modify the authorized file(s) in the repository working tree.\nThe actual repository change is the required output.")
 
     criteria = produced_data.get("acceptance_criteria")
     if criteria and isinstance(criteria, list):
@@ -499,12 +524,12 @@ def approve_plan_if_authorized(
 
 
 def dispatch_jules(ctl: LabeebController, state: dict[str, Any]) -> None:
-    """Prepare jules_create effect for approved plan."""
+    """Prepare jules_create effect for approved plan with deterministic materialization contract."""
     contract = read_ref_json(state["contract_ref"])
     plan = read_ref_json(state["plan_ref"])
     execution = plan.get("execution") or {}
-    prompt = str(execution.get("jules_prompt") or "").strip()
-    if not prompt:
+    raw_prompt = str(execution.get("jules_prompt") or "").strip()
+    if not raw_prompt:
         ctl.block(state, "Approved plan has no Jules execution prompt")
         return
     max_rounds = int(ctl.config.get("planning.max_execution_rounds", 2))
@@ -514,14 +539,29 @@ def dispatch_jules(ctl: LabeebController, state: dict[str, Any]) -> None:
         return
     state["execution_rounds"] = current_rounds + 1
     state["macro_phase"] = "EXECUTE"
+    state["materialization_verified"] = False
+    state.pop("materialization_anchor_ref", None)
     op_id = new_operation_id("jules-create")
     marker = safe_name(f"LABEEB-{ctl.goal_id}-EXEC-{op_id}", 120)
-    safety = "\n\nRemote-write boundary: no push, no PR creation, no merge, no production mutation, no remote ref changes. Return control if scope must widen."
+
+    from labeeb.core.prompts import compose_jules_implementation_prompt
+
+    allowed = list(execution.get("allowed_paths") or contract.get("allowed_paths") or [])
+    validation = list(execution.get("validation_commands") or contract.get("validation_commands") or [])
+    expected = list(execution.get("expected_outputs") or (plan.get("produced_artifact") or {}).get("data", {}).get("expected_outputs") or [])
+
+    full_prompt = compose_jules_implementation_prompt(
+        execution_prompt=raw_prompt,
+        allowed_paths=allowed,
+        validation_commands=validation,
+        expected_outputs=expected,
+    )
+
     payload = {
         "repo": contract["repo"],
         "branch": contract["branch"],
         "marker": marker,
-        "prompt": prompt + safety,
+        "prompt": full_prompt,
         "require_approval": bool(ctl.config.get("workflow.jules_require_plan_approval", False)),
     }
     ctl.prepare_effect(state, "jules_create", payload, "WAITING_JULES")

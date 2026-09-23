@@ -72,6 +72,18 @@ def has_repair_causality(
     return bool(agent_msg_seen or new_patch_seen)
 
 
+def materialization_response_activities(logs: dict[str, Any], anchor: dict[str, Any]) -> list[dict[str, Any]]:
+    """Return only Jules activities following the marked protocol correction."""
+    old = set(anchor.get("activity_keys") or [])
+    marker = str(anchor.get("marker") or "")
+    activities = ordered_activities([a for a in logs.get("activities") or [] if isinstance(a, dict)])
+    fresh = [a for a in activities if activity_key(a) not in old]
+    for index, activity in enumerate(fresh):
+        if isinstance(activity.get("userMessaged"), dict) and marker and marker in activity_text(activity):
+            return fresh[index + 1:]
+    return []
+
+
 def meaningful_event(
     state: dict[str, Any],
     session: dict[str, Any],
@@ -110,6 +122,16 @@ def meaningful_event(
         key = f"jules-terminal:{jstate}:" + str(session.get("updateTime") or "")
         return None if key in handled else (key, {"type": jstate})
     if jstate == "COMPLETED" and action == "review":
+        if state.get("materialization_anchor_ref"):
+            anchor = read_ref_json(state["materialization_anchor_ref"])
+            if anchor.get("session_id") != state.get("jules_session_id"):
+                raise ControllerError("Materialization correction anchor belongs to another Jules session")
+            response = materialization_response_activities(logs, anchor)
+            if not any(isinstance(a.get("agentMessaged"), dict) or patch_candidates([a]) for a in response):
+                return None
+            keys = sorted(activity_key(a) for a in response)
+            key = "jules-completed-materialization:" + sha256_text(canonical_json(keys))
+            return None if key in handled else (key, {"type": "COMPLETED", "round": "materialization"})
         if state.get("repair_reserved") and state.get("round_anchor_ref"):
             anchor = read_ref_json(state["round_anchor_ref"])
             old = set(anchor.get("activity_keys") or [])

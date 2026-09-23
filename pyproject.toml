@@ -12,3 +12,6 @@ ignore = ["E501"]
 # These files intentionally alter sys.path and re-export compatibility names.
 "labeeb_controller.py" = ["E402", "F401"]
 "labeeb/cli/main.py" = ["E402"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]

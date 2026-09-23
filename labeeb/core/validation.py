@@ -7,6 +7,7 @@ import time
 from typing import Any
 
 from labeeb.config import Config
+from labeeb.core.events import materialization_response_activities
 from labeeb.errors import CommandError
 from labeeb.models import (
     ArtifactValidity,
@@ -37,10 +38,15 @@ def prepare_review_evidence(
 ) -> dict[str, Any]:
     activities = [x for x in (logs.get("activities") or []) if isinstance(x, dict)]
     relevant = activities
-    if state.get("repair_reserved") and state.get("round_anchor_ref"):
+    old_patch_hashes: set[str] = set()
+    if state.get("materialization_anchor_ref"):
+        anchor = read_ref_json(state["materialization_anchor_ref"])
+        relevant = materialization_response_activities(logs, anchor)
+        old_patch_hashes = set(anchor.get("patch_hashes") or [])
+    elif state.get("repair_reserved") and state.get("round_anchor_ref"):
         old = set(read_ref_json(state["round_anchor_ref"]).get("activity_keys") or [])
         relevant = [a for a in activities if activity_key(a) not in old]
-    patches = patch_candidates(relevant)
+    patches = [p for p in patch_candidates(relevant) if sha256_text(p["patch"]) not in old_patch_hashes]
     chosen = patches[-1] if patches else None
     patch_ref = None
     patch_hash = None

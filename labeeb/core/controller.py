@@ -19,6 +19,7 @@ from labeeb.core.effects import EffectManager
 from labeeb.core.events import (
     append_domain_event,
     global_event_bus,
+    jules_snapshot,
     meaningful_event,
     reserve_event_key,
 )
@@ -204,6 +205,8 @@ class LabeebController:
             "current_activity": "authority_context",
             "artifacts": {},
             "execution_rounds": 0,
+            "materialization_corrections": 0,
+            "materialization_verified": False,
             "proof_path_locked": False,
             "path_integrity_status": "ORIGINAL",
             "reasoning_history": [],
@@ -383,6 +386,7 @@ class LabeebController:
         }
         state["result_ref"] = self.store.write_json(self.paths.results, result)
         state["phase"] = "BLOCKED"
+        state["blocked_reason"] = reason
         state["active_task"] = None
         state.pop("pending_terminal", None)
         pending = state.get("pending_action")
@@ -636,6 +640,11 @@ class LabeebController:
             before = state["phase"]
             self.approve_plan_if_authorized(state)
             return state["phase"] != before
+        if phase == "AWAITING_IMPLEMENTATION_REVIEW":
+            if not bool(self.config.get("implementation.pause_after_implementation", False)):
+                self.approve_implementation(state)
+                return True
+            return False
         if phase == "WAITING_JULES":
             return self.step_waiting_jules(state)
         if phase == "VALIDATING":
@@ -645,6 +654,59 @@ class LabeebController:
             return True
         self.block(state, f"Unknown phase: {phase}")
         return True
+
+    def handle_unmaterialized_response(
+        self,
+        state: dict[str, Any],
+        session: dict[str, Any],
+        logs: dict[str, Any],
+        event_payload: dict[str, Any],
+    ) -> bool:
+        max_corrections = int(self.config.get("implementation.max_materialization_corrections", 1))
+        current_corrections = int(state.get("materialization_corrections", 0))
+        sid = state.get("jules_session_id")
+        if current_corrections < max_corrections:
+            state["materialization_corrections"] = current_corrections + 1
+            from labeeb.core.prompts import build_materialization_correction_message
+
+            op_id = new_operation_id("materialization")
+            marker = f"[LABEEB-MATERIALIZE:{self.goal_id}:{op_id}]"
+            anchor = jules_snapshot(logs)
+            anchor.update({"marker": marker, "session_id": sid, "reserved_at": utc_now()})
+            state["materialization_anchor_ref"] = self.store.write_json(
+                self.paths.evidence / f"materialization-anchor-{op_id}.json", anchor
+            )
+            correction_msg = f"{marker}\n{build_materialization_correction_message()}"
+            payload = {
+                "session_id": sid,
+                "marker": marker,
+                "message": correction_msg,
+            }
+            self.prepare_effect(state, "jules_message", payload, "WAITING_JULES")
+            self.record_event("implementation.materialization_correction", {
+                "session_id": sid,
+                "correction_count": state["materialization_corrections"],
+                "max_corrections": max_corrections,
+                "reason": "Text or diff received without materialized repository working-tree changes",
+            })
+            self.record_event("jules.responded_awaiting_evidence", {
+                "session_id": sid,
+                "state": session.get("state"),
+            })
+            self.store.save(state)
+            return True
+        else:
+            state.pop("materialization_anchor_ref", None)
+            self.block(
+                state,
+                "Implementation worker did not materialize the requested repository changes.",
+                evidence={
+                    "session_id": sid,
+                    "materialization_corrections": current_corrections,
+                    "session_state": session.get("state"),
+                },
+            )
+            return True
 
     def step_waiting_jules(self, state: dict[str, Any]) -> bool:
         sid = state.get("jules_session_id")
@@ -676,10 +738,42 @@ class LabeebController:
             return True
         if event_payload["type"] == "COMPLETED":
             evidence = prepare_review_evidence(state, event_payload, session, logs, self.paths, self.store)
+            has_materialized_changes = bool(evidence.get("patch_ref") and (evidence.get("changed_paths") or []))
+            if not has_materialized_changes:
+                return self.handle_unmaterialized_response(state, session, logs, event_payload)
+
             from labeeb.models import sha256_text
 
             review_ref = self.store.write_json(self.paths.reviews / f"evidence-{sha256_text(key)[:12]}.json", evidence)
             state["review_ref"] = review_ref
+            state.pop("materialization_anchor_ref", None)
+            if evidence.get("out_of_scope_paths"):
+                self.block(
+                    state,
+                    "Implementation patch contains paths outside allowed scope",
+                    evidence={"review_ref": review_ref, "paths": evidence["out_of_scope_paths"]},
+                )
+                return True
+
+            state["materialization_verified"] = True
+            self.record_event("implementation.materialized", {
+                "session_id": state.get("jules_session_id"),
+                "round": state.get("execution_rounds", 1),
+                "patch_hash": evidence.get("patch_hash"),
+                "files": evidence.get("changed_paths") or [],
+                "out_of_scope_paths": evidence.get("out_of_scope_paths") or [],
+            })
+
+            if bool(self.config.get("implementation.pause_after_implementation", False)):
+                state["phase"] = "AWAITING_IMPLEMENTATION_REVIEW"
+                self.store.save(state)
+                self.record_event("implementation.awaiting_review", {
+                    "session_id": state.get("jules_session_id"),
+                    "round": state.get("execution_rounds", 1),
+                    "files": evidence.get("changed_paths") or [],
+                })
+                return True
+
             state["phase"] = "VALIDATING"
             state["macro_phase"] = "PROVE"
             self.store.save(state)
@@ -687,7 +781,7 @@ class LabeebController:
                 "session_id": state.get("jules_session_id"),
                 "round": state.get("execution_rounds", 1),
                 "patch_hash": evidence.get("patch_hash"),
-                "files": evidence.get("files") or [],
+                "files": evidence.get("files") or evidence.get("changed_paths") or [],
             })
             self.record_event("prove.started", {"round": state.get("execution_rounds", 1)})
             return True
@@ -841,9 +935,35 @@ class LabeebController:
     def approve_plan(self) -> None:
         with self.store.locked():
             state = self.store.load()
+            if state["phase"] == "AWAITING_IMPLEMENTATION_REVIEW":
+                self.approve_implementation(state)
+                return
             if state["phase"] != "PLAN_GATE":
                 raise ControllerError(f"Goal is not waiting at PLAN_GATE (phase={state['phase']})")
             self.approve_plan_if_authorized(state, manual_approval=True)
+
+    def approve_implementation(self, state: dict[str, Any] | None = None) -> None:
+        def _do(s: dict[str, Any]) -> None:
+            if s["phase"] != "AWAITING_IMPLEMENTATION_REVIEW":
+                raise ControllerError(f"Goal is not waiting at AWAITING_IMPLEMENTATION_REVIEW (phase={s['phase']})")
+            s["phase"] = "VALIDATING"
+            s["macro_phase"] = "PROVE"
+            self.store.save(s)
+            evidence = read_ref_json(s["review_ref"]) if s.get("review_ref") else {}
+            self.record_event("worker.completed", {
+                "session_id": s.get("jules_session_id"),
+                "round": s.get("execution_rounds", 1),
+                "patch_hash": evidence.get("patch_hash"),
+                "files": evidence.get("files") or evidence.get("changed_paths") or [],
+            })
+            self.record_event("prove.started", {"round": s.get("execution_rounds", 1)})
+
+        if state is not None:
+            _do(state)
+        else:
+            with self.store.locked():
+                s = self.store.load()
+                _do(s)
 
     def status(self) -> dict[str, Any]:
         state = self.store.load()

@@ -73,6 +73,13 @@ def validate_config(config: Config) -> None:
     for key in ("allow_push", "allow_pr", "allow_merge", "allow_production_mutation"):
         if bool(config.get(f"safety.{key}", False)):
             raise ConfigError(f"V1 does not permit safety.{key}=true")
+    if config.get("implementation.require_materialized_changes", True) is not True:
+        raise ConfigError("implementation.require_materialized_changes must be true")
+    corrections = config.get("implementation.max_materialization_corrections", 1)
+    if type(corrections) is not int or corrections != 1:
+        raise ConfigError("implementation.max_materialization_corrections must be 1")
+    if type(config.get("implementation.pause_after_implementation", False)) is not bool:
+        raise ConfigError("implementation.pause_after_implementation must be a boolean")
     allowed_actions = {"wait", "wake", "review", "block"}
     actions = config.section("jules_state_actions")
     for state, action in actions.items():
