@@ -1,7 +1,9 @@
 """Canonical prompt fragments and deterministic composition for Jules implementation workers."""
 from __future__ import annotations
 
+import re
 import textwrap
+from typing import Any
 
 REMOTE_WRITE_BOUNDARY = textwrap.dedent(
     """\
@@ -76,6 +78,85 @@ def build_materialization_correction_message() -> str:
 
         Stop after the actual change is materialized and return control."""
     ).strip()
+
+
+def _sanitize_direct_prompt(prompt_str: str) -> str:
+    """Sanitize phrases in Brain prompts that encourage textual/diff-only responses."""
+    text = prompt_str.strip()
+    replacements = [
+        (re.compile(r"Produce a unified patch containing only", re.IGNORECASE), "Create or modify the following file(s) in the repository working tree:"),
+        (re.compile(r"Produce a unified patch\b", re.IGNORECASE), "Create or modify the authorized file(s) in the repository working tree"),
+        (re.compile(r"Produce a patch\b", re.IGNORECASE), "Create or modify the authorized file(s) in the repository working tree"),
+        (re.compile(r"Return a patch\b", re.IGNORECASE), "Materialize the changes in the repository working tree"),
+        (re.compile(r"Output the following file\b", re.IGNORECASE), "Create or modify the following file in the repository working tree"),
+    ]
+    for pattern, repl in replacements:
+        text = pattern.sub(repl, text)
+    return text
+
+
+def build_jules_prompt(
+    execution: dict[str, Any],
+    produced_data: dict[str, Any],
+    plan_summary: str = "",
+) -> str:
+    """Extract or synthesize a complete Jules prompt from execution or artifact data, emphasizing working-tree mutation."""
+    direct = (
+        execution.get("jules_prompt")
+        or execution.get("prompt")
+        or produced_data.get("jules_prompt")
+        or produced_data.get("prompt")
+    )
+    if direct and str(direct).strip():
+        return _sanitize_direct_prompt(str(direct))
+
+    # Synthesize from structured execution_contract artifact fields
+    sections: list[str] = []
+    goal = (
+        produced_data.get("goal")
+        or produced_data.get("approved_direction")
+        or plan_summary
+    )
+    if goal:
+        sections.append(f"Goal:\n{goal}")
+
+    impl = produced_data.get("implementation") or produced_data.get("instructions")
+    if impl:
+        if isinstance(impl, list):
+            sections.append("Implementation Steps:\n" + "\n".join(f"- {s}" for s in impl))
+        elif isinstance(impl, str) and impl.strip():
+            sections.append(f"Implementation:\n{impl.strip()}")
+
+    new_files = produced_data.get("new_files") or []
+    modified_files = produced_data.get("modified_files") or []
+    expected = produced_data.get("expected_worker_output") or produced_data.get("expected_output")
+
+    if new_files and isinstance(new_files, list):
+        sections.append("Required Materialized File(s):\n" + "\n".join(f"- {f}" for f in new_files))
+    if modified_files and isinstance(modified_files, list):
+        sections.append("Required Working-Tree Modifications:\n" + "\n".join(f"- {f}" for f in modified_files))
+    if expected and not (new_files or modified_files):
+        sections.append(f"Required Working-Tree Changes:\n{expected}\nThe actual repository change is the required output.")
+    elif not (new_files or modified_files):
+        sections.append("Required Action:\nCreate or modify the authorized file(s) in the repository working tree.\nThe actual repository change is the required output.")
+
+    criteria = produced_data.get("acceptance_criteria")
+    if criteria and isinstance(criteria, list):
+        sections.append("Acceptance Criteria:\n" + "\n".join(f"- {c}" for c in criteria))
+
+    paths = execution.get("allowed_paths") or produced_data.get("allowed_paths")
+    if paths and isinstance(paths, list):
+        sections.append("Allowed Paths:\n" + "\n".join(f"- {p}" for p in paths))
+
+    cmds = execution.get("validation_commands") or produced_data.get("validation_commands")
+    if cmds and isinstance(cmds, list):
+        sections.append("Validation Commands:\n" + "\n".join(f"- {c}" for c in cmds))
+
+    stop_conds = produced_data.get("stop_conditions")
+    if stop_conds and isinstance(stop_conds, list):
+        sections.append("Stop Conditions:\n" + "\n".join(f"- {c}" for c in stop_conds))
+
+    return "\n\n".join(sections).strip()
 
 
 def compose_jules_implementation_prompt(

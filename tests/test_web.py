@@ -104,6 +104,11 @@ class WebUITests(unittest.TestCase):
         self.assertEqual(resp.status_code, 200)
         self.assertIn("Labeeb Orchestrator Developer UI Theme", resp.text)
 
+        for sub_css in ("variables.css", "layout.css", "components.css", "diff.css"):
+            sub_resp = self.client.get(f"/static/css/{sub_css}")
+            self.assertEqual(sub_resp.status_code, 200)
+            self.assertTrue(len(sub_resp.text) > 50)
+
     def test_index_and_dashboard(self):
         resp = self.client.get("/", follow_redirects=False)
         self.assertIn(resp.status_code, {302, 303, 307})
