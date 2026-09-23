@@ -81,54 +81,79 @@ flowchart TD
       G --> H[diagnosis]:::solution
       H --> I[solution_candidates]:::solution
       I --> J[second_audit]:::solution
-      J --> K[critic_review]:::review
-      K --> L[convergence]:::review
-      L --> M[change_authority]:::gate
-      M --> N[implementation_readiness]:::gate
-      N --> O[execution_contract]:::gate
+      J --> K[delivery_readiness]:::solution
+      K --> L[critic_review]:::review
+      L --> M[convergence]:::review
+      M --> N[change_authority]:::gate
+      N --> O[implementation_readiness]:::gate
+      O --> P[execution_contract]:::gate
   ```
 
-  #### AI-Parseable DAG Activity Specification
+  #### AI-Parseable DAG Activity Specification (16 Activities)
 
-  | Step | Activity Identifier | Stage Category | Primary Objective | Output Artifact | Next Direct Activity |
-  | :--- | :--- | :--- | :--- | :--- | :--- |
-  | 1 | `authority_context` | Contract | Extract authority boundaries and workspace path | `authority_context.v*.json` | `goal_contract` |
-  | 2 | `goal_contract` | Contract | Compile observable outcome, current and expected behavior | `goal_contract.v*.json` | `product_validation` |
-  | 3 | `product_validation` | Contract | Define user journey and acceptance criteria checklist | `product_contract.v*.json` | `proof_contract` |
-  | 4 | `proof_contract` | Contract | Define verifiable entrypoints and validation commands | `proof_contract.v*.json` | `reality_audit` |
-  | 5 | `reality_audit` | Audit | Inspect callers, existing helpers, and deliberate reuse | `reality_audit.v*.json` | `mutation_preflight` |
-  | 6 | `mutation_preflight` | Audit | Assess blast radius, affected modules, and bounds | `mutation_preflight.v*.json` | `baseline_result` |
-  | 7 | `baseline_result` | Audit | Execute validation entrypoint before edits to verify state | `baseline_result.v*.json` | `diagnosis` |
-  | 8 | `diagnosis` | Solution | Diagnose root cause of baseline failure | `diagnosis.v*.json` | `solution_candidates` |
-  | 9 | `solution_candidates` | Solution | Evaluate alternative approaches with reuse bias | `solution_candidates.v*.json` | `second_audit` |
-  | 10 | `second_audit` | Solution | Actively attempt to disprove preferred solution | `second_audit.v*.json` | `critic_review` |
-  | 11 | `critic_review` | Review | Adversarial critique via Claude Critic (`--tools ""`) | `critic_review.v*.json` | `convergence` |
-  | 12 | `convergence` | Review | Reconcile findings against repository evidence | `convergence.v*.json` | `change_authority` |
-  | 13 | `change_authority` | Gate | Classify repair authority (LOCAL, GATED, INCIDENTAL) | `change_authority.v*.json` | `implementation_readiness` |
-  | 14 | `implementation_readiness` | Gate | Verify bounded allowed paths, commands, and artifacts | `implementation_readiness.v*.json` | `execution_contract` |
-  | 15 | `execution_contract` | Gate | Package explicit, locked prompt for Jules implementer | `execution_contract.v*.json` | *Worker Dispatch* |
+  | Step | Activity Identifier | Canonical Enum | Stage Category | Primary Objective | Output Artifact | Next Direct Activity / Allowed Skips |
+  | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+  | 1 | `authority_context` | `authority_context` | Contract | Extract authority boundaries and workspace path | `authority_context.v*.json` | `goal_contract` |
+  | 2 | `goal_contract` | `goal_contract` | Contract | Compile observable outcome, current and expected behavior | `goal_contract.v*.json` | `product_validation`, or skip to `proof_contract` |
+  | 3 | `product_validation` | `product_validation` | Contract | Define user journey and acceptance checklist (emit `NOT_APPLICABLE` for non-UI/backend) | `product_contract.v*.json` | `proof_contract` |
+  | 4 | `proof_contract` | `proof_contract` | Contract | Define verifiable entrypoints and validation commands | `proof_contract.v*.json` | `reality_audit` |
+  | 5 | `reality_audit` | `reality_audit` | Audit | Inspect callers, existing helpers, and deliberate reuse | `reality_audit.v*.json` | `mutation_preflight`, or skip to `baseline` |
+  | 6 | `mutation_preflight` | `mutation_preflight` | Audit | Assess blast radius, affected modules, and bounds | `mutation_preflight.v*.json` | `baseline_result`, or skip to `diagnosis`/`solution_candidates` |
+  | 7 | `baseline_result` | `baseline` | Audit | Execute validation entrypoint before edits to verify state | `baseline_result.v*.json` | `diagnosis`, or skip to `solution_candidates`/`second_audit` |
+  | 8 | `diagnosis` | `diagnosis` | Solution | Diagnose root cause of baseline failure | `diagnosis.v*.json` | `solution_candidates`, or skip to `second_audit` |
+  | 9 | `solution_candidates` | `solution_exploration` | Solution | Evaluate alternative approaches with reuse bias | `solution_candidates.v*.json` | `second_audit`, or forward gates |
+  | 10 | `second_audit` | `second_reality_audit` | Solution | Actively attempt to disprove preferred solution | `second_audit.v*.json` | `delivery_readiness`, `critic_review`, or `change_authority` |
+  | 11 | `delivery_readiness` | `delivery_readiness` | Solution | Verify solution against functional user journey (optional for backend/tests) | `delivery_review.v*.json` | `critic_review`, `convergence`, or `change_authority` |
+  | 12 | `critic_review` | `independent_critique` | Review | Adversarial critique via Claude Critic (active on high-risk; can advance to change_authority if clean) | `critic_review.v*.json` | `convergence`, or skip to `change_authority` |
+  | 13 | `convergence` | `convergence` | Review | Reconcile findings against repository evidence | `convergence.v*.json` | `change_authority`, or `implementation_readiness` |
+  | 14 | `change_authority` | `change_authority` | Gate | Classify repair authority (LOCAL, GATED, INCIDENTAL) | `change_authority.v*.json` | `implementation_readiness`, or `execution_contract` |
+  | 15 | `implementation_readiness` | `implementation_readiness` | Gate | Verify bounded allowed paths, commands, and artifacts | `implementation_readiness.v*.json` | `execution_contract` |
+  | 16 | `execution_contract` | `execution_contract` | Gate | Package explicit, locked prompt for Jules implementer | `execution_contract.v*.json` | *Worker Dispatch* (`IMPLEMENTATION_READY`) |
+
+  *Note*: Any activity can perform a self-transition (`next_activity == current_activity`) to refine its analysis or fulfill multi-turn investigation within the progress budget (`max_repeats = 3`). Any activity may also backtrack to earlier contract/audit anchors when an assumption is disproven.
 
 - **Structured Output Protocol**:
-  The Brain never emits loose chat prose. It communicates exclusively via structured JSON envelopes:
+  The Brain never emits loose chat prose. During reasoning DAG turns, it communicates exclusively via structured JSON envelopes:
   ```json
   <<<LABEEB_DECISION_START>>>
   {
-    "action": "PLAN_READY",
-    "reason": "Bounded implementation plan formulated with standard-library unittest",
-    "goal_contract": {
-      "observable_outcome": "Tests verify Python 3.10+ runtime and .env.example presence",
-      "current_behavior": "No smoke test file present under tests/",
-      "expected_behavior": "tests/test_smoke.py exists and asserts environment sanity",
-      "acceptance_criteria": [
-        "tests/test_smoke.py exists",
-        "test_environment_smoke executes and exits with 0"
-      ],
-      "constraints": [
-        "Do not modify pyproject.toml",
-        "Do not introduce third-party dependencies"
-      ],
-      "non_goals": ["Integration testing of full web pipeline"],
-      "must_not_change": ["labeeb/core/controller.py", "config.toml"]
+    "decision": "CONTINUE_REASONING",
+    "current_activity": "second_reality_audit",
+    "activity_status": "SATISFIED",
+    "not_applicable_reason": null,
+    "next_activity": "critic_review",
+    "reason": "Bounded solution verified against secondary callers; ready for adversarial critique.",
+    "produced_artifact": {
+      "artifact_type": "second_audit",
+      "data": {
+        "status": "PASS",
+        "disproved_candidates": ["reinventing custom parser"],
+        "accepted_candidate": "standard-library unittest"
+      }
+    },
+    "invalidate_roots": [],
+    "evidence_refs": ["file:tests/test_smoke.py#L1-L20"],
+    "human_checkpoint": {
+      "needed": false,
+      "boundary_type": null,
+      "question": null
+    }
+  }
+  <<<LABEEB_DECISION_END>>>
+  ```
+
+  At terminal planning completion (activity `execution_contract`), the Brain emits:
+  ```json
+  <<<LABEEB_DECISION_START>>>
+  {
+    "decision": "IMPLEMENTATION_READY",
+    "current_activity": "execution_contract",
+    "activity_status": "SATISFIED",
+    "next_activity": null,
+    "reason": "Bounded execution contract formulated with locked validation commands.",
+    "produced_artifact": {
+      "artifact_type": "execution_contract",
+      "data": {}
     },
     "execution": {
       "jules_prompt": "Create tests/test_smoke.py defining test_environment_smoke...",
