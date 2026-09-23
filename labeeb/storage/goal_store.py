@@ -184,3 +184,11 @@ class GoalStore:
             fh.write(line)
             fh.flush()
             os.fsync(fh.fileno())
+
+    def read_events(self) -> list[dict[str, Any]]:
+        from labeeb.core.events import read_domain_events
+
+        if not self.paths.events.exists():
+            return []
+        events, _ = read_domain_events(self.paths.events, after_line=0)
+        return events

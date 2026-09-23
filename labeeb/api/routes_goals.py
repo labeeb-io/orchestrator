@@ -4,7 +4,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import os
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request, Response
 from pydantic import BaseModel, Field
 
 from labeeb.config import Config
@@ -27,6 +27,7 @@ class CreateGoalRequest(BaseModel):
     preauthorize_plan: bool = False
     deadline_hours: float | None = None
     background: bool = True
+    force: bool = False
 
 
 class RunGoalRequest(BaseModel):
@@ -56,6 +57,7 @@ async def create_goal(payload: CreateGoalRequest, request: Request):
             validation_commands=payload.validation_commands,
             preauthorize_plan=payload.preauthorize_plan,
             deadline_hours=payload.deadline_hours,
+            force=payload.force,
         )
         pid = None
         if payload.background:
@@ -91,6 +93,8 @@ async def approve_goal(goal_id: str, request: Request):
         raise HTTPException(status_code=404, detail=f"Goal {goal_id} not found")
     try:
         ctl.approve_plan()
+        if request.headers.get("HX-Request"):
+            return Response(status_code=200, headers={"HX-Trigger": "goalUpdated"})
         return {"goal_id": goal_id, "phase": ctl.status()["phase"]}
     except ControllerError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
@@ -119,6 +123,8 @@ async def stop_goal(goal_id: str, request: Request):
             st = ctl.store.load()
             if st.get("phase") not in TERMINAL_PHASES:
                 ctl.block(st, "Manual stop requested")
+    if request.headers.get("HX-Request"):
+        return Response(status_code=200, headers={"HX-Trigger": "goalUpdated"})
     return {"goal_id": goal_id, "stop_requested": True}
 
 
@@ -138,6 +144,8 @@ async def unblock_goal(goal_id: str, request: Request, payload: UnblockGoalReque
         bg = payload.background
     try:
         result = ctl.unblock_and_retry(background=bg)
+        if request.headers.get("HX-Request"):
+            return Response(status_code=200, headers={"HX-Trigger": "goalUpdated"})
         return result
     except ControllerError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
@@ -161,6 +169,8 @@ async def resume_goal(goal_id: str, request: Request, payload: RunGoalRequest | 
     try:
         ctl.clear_stop_request()
         state = await asyncio.to_thread(ctl.run, once=once)
+        if request.headers.get("HX-Request"):
+            return Response(status_code=200, headers={"HX-Trigger": "goalUpdated"})
         return state
     except ControllerError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
@@ -175,6 +185,8 @@ async def reconcile_goal(goal_id: str, request: Request):
         raise HTTPException(status_code=404, detail=f"Goal {goal_id} not found")
     try:
         state = await asyncio.to_thread(ctl.reconcile_pending_or_blocked)
+        if request.headers.get("HX-Request"):
+            return Response(status_code=200, headers={"HX-Trigger": "goalUpdated"})
         return state
     except ControllerError as exc:
         raise HTTPException(status_code=400, detail=str(exc))

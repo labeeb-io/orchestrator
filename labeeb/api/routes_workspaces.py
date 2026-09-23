@@ -25,8 +25,8 @@ DEFAULT_PRESETS = [
         "id": "labeeb-orchestrator",
         "name": "labeeb-orchestrator (Control Plane)",
         "path": str(pathlib.Path.home() / "webserver" / "server" / "www" / "labeeb-orchestrator"),
-        "repo": "labeeb-io/labeeb-orchestrator",
-        "default_branch": "master",
+        "repo": "labeeb-io/orchestrator",
+        "default_branch": "main",
         "allowed_paths": ["labeeb", "tests"],
         "validation_commands": [".venv/bin/python -m pytest tests/"],
     },
@@ -56,6 +56,8 @@ def _inspect_git_sync(target_path: pathlib.Path) -> dict[str, Any]:
         "repo": "",
         "default_branch": "master",
         "branches": [],
+        "jules_authorized": None,
+        "jules_sources": [],
         "error": None,
     }
 
@@ -134,6 +136,20 @@ def _inspect_git_sync(target_path: pathlib.Path) -> dict[str, Any]:
 
         result["branches"] = branches_sorted
         result["valid"] = True
+
+        if result["repo"]:
+            try:
+                from labeeb.config import load_config
+                from labeeb.providers.jules import JulesProvider
+                cfg = load_config()
+                jp = JulesProvider(cfg)
+                is_avail, sources = jp.is_repo_available(result["repo"])
+                result["jules_sources"] = sources
+                result["jules_authorized"] = is_avail if sources else None
+            except Exception:
+                result["jules_sources"] = []
+                result["jules_authorized"] = None
+
         return result
 
     except Exception as exc:
@@ -152,3 +168,20 @@ async def inspect_workspace(path: str = Query(..., description="Local workspace 
     """Inspect a local workspace path for git repository information and branches."""
     expanded = pathlib.Path(os.path.expanduser(path.strip())).resolve()
     return await asyncio.to_thread(_inspect_git_sync, expanded)
+
+
+@router.get("/jules/sources")
+async def get_jules_sources():
+    """Return all GitHub repository sources authorized in Google Jules."""
+    def _fetch():
+        try:
+            from labeeb.config import load_config
+            from labeeb.providers.jules import JulesProvider
+            cfg = load_config()
+            jp = JulesProvider(cfg)
+            sources = jp.list_sources()
+            return {"sources": sources, "count": len(sources)}
+        except Exception as exc:
+            return {"sources": [], "count": 0, "error": str(exc)}
+
+    return await asyncio.to_thread(_fetch)

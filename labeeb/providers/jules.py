@@ -1,6 +1,7 @@
 """Provider adapter for Google Jules via cjules CLI."""
 from __future__ import annotations
 
+import json
 import re
 import shutil
 import time
@@ -232,3 +233,67 @@ class JulesProvider:
             if i + 1 < attempts:
                 time.sleep(delay)
         return []
+
+    def list_sources(self) -> list[str]:
+        result = run_cmd(
+            [self.cjules, "sources", "list", "-f", "json"],
+            timeout=float(self.config.get("timeouts.jules_read_seconds", 30)),
+            check=False,
+        )
+        if result.rc != 0:
+            result = run_cmd(
+                [self.cjules, "sources", "list"],
+                timeout=float(self.config.get("timeouts.jules_read_seconds", 30)),
+                check=False,
+            )
+        if result.rc != 0:
+            return []
+
+        repos: set[str] = set()
+        stdout_text = result.stdout.strip()
+        if stdout_text:
+            try:
+                payload = json.loads(stdout_text)
+                if isinstance(payload, list):
+                    for item in payload:
+                        if isinstance(item, dict):
+                            src = str(item.get("name") or item.get("id") or item.get("source") or "")
+                            m = re.search(r"github/(.+)$", src)
+                            if m:
+                                repos.add(m.group(1).rstrip("/"))
+                            elif item.get("githubRepo"):
+                                gh = item["githubRepo"]
+                                owner = gh.get("owner")
+                                rname = gh.get("repo")
+                                if owner and rname:
+                                    repos.add(f"{owner}/{rname}")
+                        elif isinstance(item, str):
+                            m = re.search(r"github/(.+)$", item)
+                            if m:
+                                repos.add(m.group(1).rstrip("/"))
+            except Exception:
+                pass
+
+        for line in result.stdout.splitlines():
+            line = line.strip()
+            m = re.search(r"sources/github/([a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+)", line)
+            if m:
+                repos.add(m.group(1))
+
+        return sorted(repos)
+
+    def is_repo_available(self, repo: str) -> tuple[bool, list[str]]:
+        sources = self.list_sources()
+        if not sources:
+            # If sources cannot be discovered or cjules is not available, do not hard-block
+            return True, []
+        clean_repo = repo.strip().lower()
+        if clean_repo.endswith(".git"):
+            clean_repo = clean_repo[:-4]
+        for s in sources:
+            clean_s = s.strip().lower()
+            if clean_s.endswith(".git"):
+                clean_s = clean_s[:-4]
+            if clean_repo == clean_s:
+                return True, sources
+        return False, sources

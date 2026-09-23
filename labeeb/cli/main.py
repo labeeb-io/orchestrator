@@ -44,6 +44,7 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--preauthorize-plan", action="store_true")
     s.add_argument("--deadline-hours", type=float)
     s.add_argument("--background", action="store_true")
+    s.add_argument("--force", action="store_true", help="Bypass Jules source preflight check")
 
     r = sub.add_parser("run", help="Run/recover a goal until terminal state")
     r.add_argument("goal_id")
@@ -61,6 +62,9 @@ def build_parser() -> argparse.ArgumentParser:
     stop = sub.add_parser("stop", help="Request a safe controller stop")
     stop.add_argument("goal_id")
 
+    rec = sub.add_parser("reconcile", help="Reconcile an ambiguous or in-flight side-effect for a goal")
+    rec.add_argument("goal_id")
+
     ub = sub.add_parser("unblock", help="Unblock a BLOCKED goal and retry from the appropriate phase")
     ub.add_argument("goal_id")
     ub.add_argument("--background", action="store_true", help="Re-launch controller in background after unblocking")
@@ -71,6 +75,56 @@ def build_parser() -> argparse.ArgumentParser:
     w.add_argument("--reload", action="store_true")
 
     return p
+
+
+def format_cli_error(exc: Exception) -> str:
+    is_tty = hasattr(sys.stderr, "isatty") and sys.stderr.isatty()
+    c_red = "\033[1;31m" if is_tty else ""
+    c_bold = "\033[1m" if is_tty else ""
+    c_cyan = "\033[36m" if is_tty else ""
+    c_yellow = "\033[33m" if is_tty else ""
+    c_green = "\033[32m" if is_tty else ""
+    c_gray = "\033[90m" if is_tty else ""
+    c_reset = "\033[0m" if is_tty else ""
+
+    from labeeb.errors import JulesSourceUnauthorizedError
+
+    if isinstance(exc, JulesSourceUnauthorizedError):
+        sources = exc.sources or []
+        primary_source = sources[0] if sources else "authorized repository"
+        lines = [
+            f"{c_gray}┌─ {c_yellow}[Google Jules Repository Check]{c_gray} " + "─" * 43 + f"┐{c_reset}",
+            f"{c_gray}│{c_reset}",
+            f"{c_gray}│{c_reset}  {c_red}✖ Repository Unauthorized:{c_reset} {c_bold}{exc.repo}{c_reset}",
+            f"{c_gray}│{c_reset}",
+            f"{c_gray}│{c_reset}  Google Jules cannot mutate this repository because it has not been",
+            f"{c_gray}│{c_reset}  granted access in your Jules account.",
+            f"{c_gray}│{c_reset}",
+        ]
+        if sources:
+            lines.append(f"{c_gray}│{c_reset}  {c_bold}Authorized Sources Discovered:{c_reset}")
+            for s in sources:
+                lines.append(f"{c_gray}│{c_reset}    {c_green}• {s}{c_reset}")
+            lines.append(f"{c_gray}│{c_reset}")
+        lines.extend([
+            f"{c_gray}│{c_reset}  {c_bold}Resolution Steps:{c_reset}",
+            f"{c_gray}│{c_reset}    1. Authorize repository: {c_cyan}https://jules.google.com/{c_reset}",
+            f"{c_gray}│{c_reset}    2. Or switch repository: {c_green}--repo {primary_source}{c_reset}",
+            f"{c_gray}│{c_reset}    3. Or bypass check:      {c_yellow}--force{c_reset}",
+            f"{c_gray}│{c_reset}",
+            f"{c_gray}└" + "─" * 76 + f"┘{c_reset}",
+        ])
+        return "\n".join(lines)
+
+    msg = str(exc)
+    lines = [
+        f"{c_gray}┌─ {c_red}[Labeeb Controller Error]{c_gray} " + "─" * 49 + f"┐{c_reset}",
+        f"{c_gray}│{c_reset}",
+        f"{c_gray}│{c_reset}  {c_red}✖{c_reset} {c_bold}{msg}{c_reset}",
+        f"{c_gray}│{c_reset}",
+        f"{c_gray}└" + "─" * 76 + f"┘{c_reset}",
+    ]
+    return "\n".join(lines)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -92,6 +146,7 @@ def main(argv: list[str] | None = None) -> int:
                 validation_commands=args.validate,
                 preauthorize_plan=args.preauthorize_plan,
                 deadline_hours=args.deadline_hours,
+                force=args.force,
             )
             print(json.dumps({"goal_id": ctl.goal_id, "state": str(ctl.paths.state)}, indent=2))
             if args.background:
@@ -108,6 +163,10 @@ def main(argv: list[str] | None = None) -> int:
             return 0
 
         ctl = LabeebController(config, args.goal_id)
+        if args.command == "reconcile":
+            state = ctl.reconcile_pending_or_blocked()
+            print(json.dumps({"goal_id": ctl.goal_id, "phase": state.get("phase"), "result": state.get("result_ref")}, ensure_ascii=False, indent=2))
+            return 0
         if args.command == "run":
             state = ctl.run(once=args.once)
             print(json.dumps(state, ensure_ascii=False, indent=2))
@@ -136,7 +195,7 @@ def main(argv: list[str] | None = None) -> int:
         print("interrupted", file=sys.stderr)
         return 130
     except ControllerError as exc:
-        print(f"error: {exc}", file=sys.stderr)
+        print(format_cli_error(exc), file=sys.stderr)
         return 2
 
 
