@@ -1,273 +1,147 @@
-# Labeeb Orchestrator V1
+# Labeeb Orchestrator
 
-Small local controller for bounded engineering orchestration across:
+### From engineering intent to verified code—without handing control to an AI loop.
 
-- **Labeeb/Codex** — decision brain
-- **Claude** — optional independent read-only critic
-- **Jules** — implementation worker
-- **Python controller** — state, side effects, wait/wake, reconciliation, repair budget
-- **deterministic validation** — isolated git worktree + configured commands
-- **Developer Web UI** — high-performance FastAPI, Jinja2, HTMX, and Server-Sent Events
+Labeeb turns a software task into a controlled, reviewable workflow. Codex investigates and plans, Claude can challenge the plan, and Jules implements the approved change. A local controller keeps the process bounded, while deterministic checks verify the patch before a goal can pass.
 
-The controller runs with Python 3.12+ (dedicated `.venv` provided) and integrates with the CLIs already present in the environment: `orchestrator`, `cjules`, `git`, and optionally `claude`.
+| [![Codex](https://img.shields.io/badge/Codex-Brain-412991?logo=openai&logoColor=white)](https://openai.com/codex/) | [![Claude](https://img.shields.io/badge/Claude-Critic-D97757?logo=anthropic&logoColor=white)](https://www.anthropic.com/claude) | [![Jules](https://img.shields.io/badge/Jules-Implementer-4285F4?logo=google&logoColor=white)](https://jules.google/) | ⚙️ **Labeeb** · controller |
+| Plans and evaluates | Optional, read-only review | Implements approved work | Coordinates and verifies |
 
-## V1 safety invariants
+**Built for teams that need AI speed with engineering controls:** scoped changes, durable progress, recoverable workflows, and results backed by validation evidence.
 
-These are code-owned and intentionally not configurable:
-
-- one writer at a time per goal (`flock`)
-- atomic state writes with `fsync` + `os.replace`
-- no blind retry after an ambiguous write
-- exactly one automatic repair round
-- no push / PR / merge / production mutation
-- `PASS` requires deterministic validation when enabled
-- stale `COMPLETED` is not accepted as a repair result
-- ambiguous recovery becomes `BLOCKED`
-
-## Files
-
-```text
-labeeb_controller.py   backward-compatible CLI & entry point
-labeeb/                modular controller application package
-├── api/               FastAPI REST routes & Server-Sent Events
-├── web/               HTML views, dark developer theme, HTMX templates
-├── core/              effects engine, validation, events, state machine
-├── providers/         Orchestrator, Jules, Claude, Git, and Fake adapters
-└── storage/           single-writer flock locking & atomic GoalStore
-config.toml            customizable roles + workflow policy
-requirements.txt       fastapi, uvicorn, httpx, jinja2, python-multipart
-install.sh             optional local install helper
-examples/              start-command examples
-tests/                 20 unit & integration tests (CLI, Core, API, Web)
+```mermaid
+flowchart LR
+    U[Goal and constraints] --> B[Brain<br/>audit and plan]
+    B --> C{Critic enabled?}
+    C -->|yes| R[Claude critic<br/>read-only]
+    C -->|no| G[Plan gate]
+    R --> G
+    G -->|approved| J[Jules<br/>implementation patch]
+    J --> V[Isolated worktree<br/>apply patch and validate]
+    V --> D[Brain evaluates evidence]
+    D -->|pass| P[PASS]
+    D -->|one bounded repair| J
+    D -->|cannot safely continue| X[FAIL / BLOCKED]
+    K[(Controller state<br/>events and artifacts)] --- B
+    K --- J
+    K --- V
 ```
 
-## Quick Start: Developer Web UI
+## What makes it different
 
-Start the local control plane server:
+- **Bounded execution:** one automatic repair round; paths and validation commands are scoped per goal.
+- **Crash-aware side effects:** state is persisted before external actions, and ambiguous outcomes are reconciled instead of blindly retried.
+- **Evidence-based results:** patches are path-checked and validated in a temporary worktree. An agent's “done” message alone cannot pass a goal.
+- **Local control:** goals, events, and artifacts live on the machine. No automatic push, PR, merge, or production mutation.
+
+## How it works
+
+```mermaid
+sequenceDiagram
+    actor User
+    participant Controller
+    participant Brain
+    participant Critic
+    participant Jules
+    participant Validator
+    User->>Controller: Create goal, workspace, allowed paths, checks
+    Controller->>Brain: Audit repository and prepare bounded contract
+    opt Configured for this goal
+        Controller->>Critic: Review plan (read-only)
+        Critic-->>Controller: Findings
+        Controller->>Brain: Resolve findings
+    end
+    Controller->>Jules: Dispatch approved implementation task
+    Jules-->>Controller: Patch
+    Controller->>Validator: Check paths, apply patch, run commands in worktree
+    Validator-->>Controller: Validation evidence
+    Controller->>Brain: Evaluate contract against evidence
+    Brain-->>Controller: PASS, one repair, FAIL, or BLOCKED
+    Controller-->>User: Persisted result and evidence
+```
+
+The Brain follows a persisted reasoning graph for contract, repository audit, solution review, critique/convergence, and implementation readiness. If proof invalidates an assumption, the workflow can return to reasoning without spending the targeted repair round. See the [V2 flow guide](docs/LABEEB_CONTROLLER_V2_FLOW_GUIDE.md) for the activity graph and artifact rules.
+
+## Get started
+
+Run these from the project directory:
 
 ```bash
-./labeeb_controller.py web --port 8765
+make setup
+make doctor
+make web
 ```
 
-Then open in your browser:
-**`http://127.0.0.1:8765`**
+Open <http://127.0.0.1:8765>. `make help` lists every available command.
 
-Features:
-- **Dashboard (`/dashboard`)**: Live summary metrics, active goal cards, auto-sync.
-- **Goal Creator (`/goals/new`)**: Goal creation wizard with path and validation command builders.
-- **Goal Workspace (`/goals/{id}`)**: Visual 8-step pipeline tracker, human decision gate (`Approve` / `Stop`), patch unified diff viewer, critic review, and raw state JSON.
-- **Diagnostics (`/doctor`)**: Environment preflight checks with one-click re-test.
-- **Config Editor (`/config`)**: Role policies breakdown and safe TOML editor.
-
-## 1. Preflight
-
-Edit `config.toml` first. If `orchestrator` is only visible through NVM, set an absolute path:
-
-```toml
-[executables]
-orchestrator = "/home/hany/.nvm/versions/node/v24.21.0/bin/orchestrator"
-```
-
-Then run:
+Create a goal and pass its options through `ARGS`:
 
 ```bash
-./labeeb_controller.py --config ./config.toml doctor
+make start ARGS='--intent "Add a focused smoke test" --workspace /path/to/repository --repo OWNER/REPO --branch main --allow-path tests --validate ".venv/bin/python -m unittest discover -s tests" --preauthorize-plan --background'
 ```
 
-## 2. Start one goal
+Manage it with the same Make interface:
 
 ```bash
-./labeeb_controller.py --config ./config.toml start \
-  --intent-file ./examples/intent.md \
-  --workspace /path/to/repo \
-  --repo OWNER/REPO \
-  --branch feature-branch \
-  --risk architecture \
-  --allow-path api/app \
-  --allow-path api/tests \
-  --validate 'docker compose exec -T api php artisan test tests/Feature/TargetTest.php' \
-  --preauthorize-plan \
-  --background
+make status ARGS=<goal-id>
+make approve ARGS=<goal-id>
+make run ARGS=<goal-id>
+make stop ARGS=<goal-id>
 ```
 
-`--preauthorize-plan` means the initial intent authorizes one bounded implementation plan that stays inside the supplied authority and safety rules. Omit it if you want the controller to stop at `PLAN_GATE` for explicit approval.
+Omit `--preauthorize-plan` to require explicit plan approval. `--background` detaches the controller process; it continues only while the host/WSL instance is running.
 
-## 3. Approve a plan manually
+## Installation
+
+### Requirements
+
+- Python 3.11+
+- `git`, `orchestrator`, and `cjules` on `PATH` (or configured executable paths)
+- Optional: `claude` for the independent critic
+- Python packages in `requirements.txt` for the Web UI/API
+
+The controller core uses the Python standard library. The Web UI/API uses FastAPI, Uvicorn, Jinja2, HTTPX, and python-multipart.
+
+`make setup` creates `.venv` and installs the Web UI/API dependencies. The default interpreter is `python3`; override it if needed, for example `make setup PYTHON=python3.11`.
+
+By default, commands read `config.toml` from the project directory. Choose another config with `CONFIG=...`:
 
 ```bash
-./labeeb_controller.py --config ./config.toml approve <goal-id>
+make doctor CONFIG=~/.config/labeeb-controller/config.toml
 ```
 
-## 4. Inspect status
+### Available commands
+
+`make help` is the source of truth. Targets include `doctor`, `web`, `start`, `run`, `approve`, `status`, `background`, `stop`, `reconcile`, `unblock`, `version`, `test`, and `test-unittest`. Pass CLI flags or goal IDs with `ARGS='...'`.
+
+Goal state defaults to `~/.local/state/labeeb-controller/goals/<goal-id>/`. It includes the state machine, append-only event log, immutable reasoning artifacts, requests, patches, validation results, and reviews.
+
+## Safety boundaries
+
+| Boundary | Controller behavior |
+| --- | --- |
+| Concurrent goal actions | One writer per goal, protected by a file lock |
+| Persistence | Atomic state replacement with `fsync` |
+| Uncertain external write | Reconcile persisted intent and provider state; block if ambiguous |
+| Implementation scope | Reject patches that change paths outside the goal's allowed paths |
+| Repair | At most one targeted automatic repair |
+| Validation | Run configured commands against the patch in a detached temporary worktree |
+| Remote actions | Push, PR, merge, and production mutation are disabled |
+
+Validation commands execute on the host with the configured shell. Choose commands appropriate for your repository; Labeeb does not install project dependencies for them.
+
+## Documentation
+
+- [Usage guide](docs/usage.md) — CLI and Web UI workflows
+- [V2 flow guide](docs/LABEEB_CONTROLLER_V2_FLOW_GUIDE.md) — reasoning graph, backtracking, and artifacts
+- [Developer guide](docs/LABEEB_CONTROLLER_DEVELOPER_GUIDE.md) — modules, providers, and controller internals
+- [Design](docs/DESIGN.md) — architecture rationale and boundaries
+- [Walkthroughs](docs/) — versioned walkthroughs and research notes
+
+## Development
 
 ```bash
-./labeeb_controller.py --config ./config.toml status <goal-id>
+make test
 ```
 
-Goal state is stored under:
-
-```text
-~/.local/state/labeeb-controller/goals/<goal-id>/
-```
-
-## 5. Recovery
-
-Run the same goal again after a controller/WSL interruption:
-
-```bash
-./labeeb_controller.py --config ./config.toml run <goal-id>
-```
-
-The controller first reads persisted `pending_action`, Orchestrator task records, and Jules structured data before deciding whether it is safe to continue.
-
-## Customizing roles
-
-Roles live in `config.toml`.
-
-### Brain
-
-```toml
-[roles.brain]
-transport = "orchestrator"
-runtime = "codex"
-model = ""
-```
-
-You can switch the runtime to `claude-code` if that provider is intended to become the decision brain for a run.
-
-### Critic
-
-Default V1 uses a direct Claude invocation to enforce read-only operation technically:
-
-```toml
-[roles.critic]
-transport = "direct"
-read_only = true
-command = ["claude", "-p", "--tools", "", "--strict-mcp-config", "--output-format", "json", "--model", "opus"]
-```
-
-It inherits the existing Claude/Bifrost environment.
-
-### Implementer
-
-```toml
-[roles.implementer]
-transport = "jules"
-command = "cjules"
-```
-
-V1 intentionally requires a Jules transport for the implementation worker. The role name and executable are configurable; the safety protocol is not.
-
-## Customizing behavior
-
-### Critic policy
-
-```toml
-[workflow]
-pre_critic = "high_risk"  # never | high_risk | always
-post_critic = "high_risk"
-high_risk_tags = ["architecture", "concurrency", "persistence", "security", "public_contract", "large_blast_radius"]
-```
-
-### Jules state actions
-
-```toml
-[jules_state_actions]
-QUEUED = "wait"
-PLANNING = "wait"
-IN_PROGRESS = "wait"
-AWAITING_PLAN_APPROVAL = "wake"
-AWAITING_USER_FEEDBACK = "wake"
-PAUSED = "wake"
-COMPLETED = "review"
-FAILED = "wake"
-CANCELLED = "wake"
-UNKNOWN = "block"
-```
-
-Allowed actions are `wait`, `wake`, `review`, `block`. V1 restricts `COMPLETED` to `review` or `block` so a configuration change cannot bypass evidence collection.
-
-### Repair fallback
-
-```toml
-[workflow]
-repair_fallback = "blocked" # blocked | new_session
-```
-
-Default is conservative. If a correction sent to a completed Jules session does not create provable new work within `repair_activation_seconds`, the goal becomes `BLOCKED`.
-
-`new_session` is available as an explicit fallback. It creates a replacement Jules session from the original execution contract plus the targeted correction; continuity with the old Jules workspace is not claimed.
-
-### Brain thread rollover
-
-```toml
-[workflow]
-max_brain_resumes_per_thread = 0
-```
-
-`0` keeps the same provider thread. A positive value starts a fresh brain task after that many resumes. The event prompt is reconstructed from persisted contract, plan, and evidence, so continuity does not depend on an endless transcript.
-
-## Repair protocol
-
-V1 repair is exactly one bounded correction:
-
-```text
-review result #1
-→ reserve repair budget
-→ snapshot current Jules activity keys + patch hash
-→ send one message with unique repair marker
-→ prove matching user message exists
-→ wait for new agent activity / new patch
-→ reject stale COMPLETED
-→ validate result #2
-→ PASS / FAIL / BLOCKED
-```
-
-The controller never interprets opaque activity IDs as sortable sequence numbers.
-
-## Validation
-
-The controller never applies a Jules patch to the user's working tree.
-
-For a result it:
-
-1. extracts a structured `gitPatch` artifact from `cjules logs -f json`
-2. records patch hash + changed paths + base commit
-3. checks changed paths against the allowed path prefixes
-4. creates a detached temporary `git worktree` at the patch base commit
-5. applies the patch there
-6. runs the configured validation commands
-7. stores deterministic evidence with the review
-
-## Process durability
-
-`start --background` uses Python `start_new_session=True` and writes output to the goal directory. It is intended to survive terminal closure while the WSL instance remains alive.
-
-V1 does **not** promise progress through:
-
-- Windows sleep
-- `wsl --shutdown`
-- Windows reboot
-
-After WSL/reboot, run `run <goal-id>` manually. Auto-start/systemd is intentionally outside V1.
-
-## Tests
-
-```bash
-.venv/bin/python -m unittest discover -s tests -v
-```
-
-The package includes 20 automated unit and integration tests across 4 modules:
-- `tests/test_controller.py`: 10 legacy controller tests (backward-compatible facades, atomic refs, event reservation, stale completion rejection, 1-repair budget, and isolated git-worktree validation).
-- `tests/test_backend_core.py`: Modular storage locking (`flock`), atomic `fsync` persistence, fake provider lifecycles, and code-enforced safety invariants.
-- `tests/test_api.py`: FastAPI REST routes (`/api`, `/api/goals`, `/api/config`, `/api/system/doctor`).
-- `tests/test_web.py`: Developer Web UI views (dashboard, doctor, config editor, goal creation form submission, and detail workspace).
-
-## Live acceptance still required
-
-The code is built and locally tested, but two capabilities depend on your real installed environment and must be proven there before calling the overall system production-ready:
-
-1. `cjules msg <COMPLETED_SESSION>` actually causes a completed Jules session to perform new work.
-2. The default read-only Claude command works with your exact Claude/Bifrost setup and still reaches the intended model.
-
-The controller handles failure conservatively if either assumption is false.
+`make test` runs the full pytest suite; `make test-unittest` runs legacy unittest discovery only.
