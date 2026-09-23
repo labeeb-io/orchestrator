@@ -227,7 +227,6 @@ class FinalReportGenerator:
         execution_rounds = int(state.get("execution_rounds", 0))
         max_execution_rounds = int(self.ctl.config.get("planning.max_execution_rounds", 2))
         repair_reserved = bool(state.get("repair_reserved", False))
-        proof_passed = terminal_status == "PASS"
         path_integrity = str(state.get("path_integrity_status") or PathIntegrityStatus.ORIGINAL)
 
         # Plan summary
@@ -241,9 +240,22 @@ class FinalReportGenerator:
 
         # Validation summary
         val_data = ev_dict.get("validation") or review.get("validation") or {}
+        has_val = bool(val_data)
+        explicit_val_status = val_data.get("status")
+        val_exit_code = val_data.get("exit_code") if has_val else None
+
+        if not has_val:
+            val_status = "UNEXECUTED"
+        elif explicit_val_status is not None:
+            val_status = str(explicit_val_status)
+        elif val_exit_code == 0:
+            val_status = "PASS"
+        else:
+            val_status = "UNKNOWN"
+
         validation_summary = {
-            "status": str(val_data.get("status") or ("PASS" if proof_passed else "UNKNOWN")),
-            "exit_code": val_data.get("exit_code", 0 if proof_passed else 1),
+            "status": val_status,
+            "exit_code": val_exit_code,
             "duration_seconds": float(val_data.get("duration_seconds") or 0.0),
             "commands": list(val_data.get("commands") or plan_summary["validation_commands"]),
             "error": val_data.get("error"),
@@ -268,7 +280,7 @@ class FinalReportGenerator:
                     {
                         "artifact_type": art_type,
                         "version": entry.get("version", 1),
-                        "status": entry.get("status", ArtifactStatus.SATISFIED),
+                        "status": entry.get("activity_status") or entry.get("status", ArtifactStatus.SATISFIED),
                         "validity": entry.get("validity", ArtifactValidity.VALID),
                         "sha256": entry.get("sha256", "")[:12],
                         "updated_at": entry.get("updated_at", ""),
@@ -337,13 +349,33 @@ class FinalReportGenerator:
                 "status": "Available",
                 "entrypoint": gp.get("entrypoint") or (contract.get("proof_contract") or {}).get("entrypoint") or plan_summary["validation_commands"],
                 "completion_probe": gp.get("completion_probe") or (contract.get("proof_contract") or {}).get("completion_probe"),
-                "proof_passed": bool(gp.get("proof_passed", proof_passed)),
+                "proof_passed": bool(gp.get("proof_passed", False)),
                 "exit_code": gp.get("entrypoint_exit_code", validation_summary["exit_code"]),
                 "path_integrity_status": str(gp.get("path_integrity_status") or path_integrity),
                 "reason": str(gp.get("reason") or ""),
             }
+            proof_passed = bool(goal_proof_ev["proof_passed"])
+        elif terminal_path == "BASELINE_SHORTCUT" or bool(state.get("baseline_shortcut")):
+            goal_proof_ev = {
+                "status": "Available",
+                "entrypoint": (contract.get("proof_contract") or {}).get("entrypoint") or plan_summary["validation_commands"],
+                "completion_probe": None,
+                "proof_passed": True,
+                "exit_code": 0,
+                "path_integrity_status": str(path_integrity),
+                "reason": "Baseline shortcut verified original code satisfied requirements",
+            }
+            proof_passed = True
         else:
-            goal_proof_ev = {"status": "Unavailable", "proof_passed": proof_passed, "reason": "No goal proof artifact recorded"}
+            # When no goal proof artifact is recorded, do NOT fall back to terminal_status.
+            # Only consider proof passed if explicit validation evidence passed with exit code 0.
+            val_passed = bool(validation_summary.get("status") == "PASS" and validation_summary.get("exit_code") == 0)
+            goal_proof_ev = {
+                "status": "Unavailable",
+                "proof_passed": val_passed,
+                "reason": "Validation exit code 0" if val_passed else "No goal proof artifact recorded",
+            }
+            proof_passed = val_passed
 
         # Baseline vs Final Delta
         base_res = _get_artifact_data("baseline_result")
@@ -582,7 +614,7 @@ class FinalReportGenerator:
             "## 3. Deterministic Validation & Proof",
             "",
             f"- **Validation Status**: `{validation_summary.get('status')}`",
-            f"- **Subprocess Exit Code**: `{validation_summary.get('exit_code')}`",
+            f"- **Subprocess Exit Code**: `{'N/A' if validation_summary.get('exit_code') is None else validation_summary.get('exit_code')}`",
             f"- **Execution Duration**: `{validation_summary.get('duration_seconds')}s`",
         ])
         gp_ev = ev.get("goal_proof") or {}
@@ -594,8 +626,10 @@ class FinalReportGenerator:
             lines.append(f"- **Path Integrity**: `{gp_ev.get('path_integrity_status')}`")
             if gp_ev.get("reason"):
                 lines.append(f"- **Diagnostic Note**: {gp_ev['reason']}")
+        elif gp_ev.get("proof_passed") is True:
+            lines.append(f"- **Goal Proof Passed**: `True` *(Legacy flow / {gp_ev.get('reason', 'Validation exit code 0')})*")
         else:
-            lines.append(f"- **Goal Proof Passed**: `{proof_passed}` *(Legacy flow / {gp_ev.get('reason', 'Not recorded')})*")
+            lines.append(f"- **Goal Proof Passed**: `Unavailable (Unverified)` *({gp_ev.get('reason', 'No goal proof artifact recorded')})*")
 
         lines.extend([
             "",

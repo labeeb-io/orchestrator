@@ -143,7 +143,19 @@ def validate_evidence(
         proof_contract_data = None
         proof_art = (state.get("artifacts") or {}).get("proof_contract")
         proof_invalid_reason = None
-        if isinstance(proof_art, dict):
+        if state.get("proof_path_locked") and state.get("locked_proof_contract_ref"):
+            locked_ref = state["locked_proof_contract_ref"]
+            if isinstance(proof_art, dict) and proof_art.get("ref") and proof_art["ref"] != locked_ref:
+                if path_integrity == PathIntegrityStatus.ALTERNATE_DIAGNOSTIC_ONLY:
+                    proof_invalid_reason = "Proof path was replaced with diagnostic-only alternate exploration"
+                else:
+                    proof_invalid_reason = f"Proof contract artifact ({proof_art['ref']}) diverges from locked original proof ref ({locked_ref})"
+            else:
+                try:
+                    proof_contract_data = read_ref_json(locked_ref).get("data", {})
+                except Exception as exc:
+                    proof_invalid_reason = f"Failed to read locked proof contract: {exc}"
+        elif isinstance(proof_art, dict):
             if proof_art.get("validity") == ArtifactValidity.VALID:
                 proof_contract_data = read_ref_json(proof_art["ref"]).get("data", {})
             else:

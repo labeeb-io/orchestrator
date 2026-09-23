@@ -497,6 +497,15 @@ def update_proof_path_lock(
     # Not yet locked
     if is_state_changing:
         state["proof_path_locked"] = True
+        proof_art = (state.get("artifacts") or {}).get("proof_contract") or {}
+        if isinstance(proof_art, dict) and proof_art.get("ref"):
+            state["locked_proof_contract_ref"] = proof_art["ref"]
+            state["locked_proof_contract_sha256"] = proof_art.get("sha256")
+        elif new_proof_contract_data.get("ref"):
+            state["locked_proof_contract_ref"] = new_proof_contract_data["ref"]
+            state["locked_proof_contract_sha256"] = new_proof_contract_data.get("sha256")
+        elif new_proof_contract_data.get("entrypoint"):
+            state["locked_proof_contract_entrypoint"] = new_proof_contract_data.get("entrypoint")
         return True, current_status
     else:
         # Read-only recompile before baseline allowed

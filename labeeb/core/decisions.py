@@ -106,6 +106,13 @@ def handle_reasoning_decision(ctl: LabeebController, state: dict[str, Any], deci
             else requested_type
         )
         art_data = produced.get("data") or {}
+        if produced_art_type == "proof_contract" and state.get("proof_path_locked"):
+            is_diag = bool(art_data.get("diagnostic_only") or decision.get("diagnostic_only"))
+            try:
+                update_proof_path_lock(state, art_data, is_diagnostic_only=is_diag)
+            except ControllerError as exc:
+                ctl.block(state, str(exc), evidence=decision)
+                return
         try:
             ctl.artifact_store.write_artifact(
                 state=state,
@@ -450,7 +457,8 @@ def approve_plan_if_authorized(
         require_proof_path_locked=False,
     )
     if readiness["ready"] and not state.get("proof_path_locked"):
-        update_proof_path_lock(state, {}, is_state_changing=True)
+        proof_art = (state.get("artifacts") or {}).get("proof_contract") or {}
+        update_proof_path_lock(state, proof_art.get("data") or {}, is_state_changing=True)
         readiness = evaluate_implementation_readiness(
             state,
             contract,

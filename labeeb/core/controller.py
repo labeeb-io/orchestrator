@@ -157,9 +157,10 @@ class LabeebController:
             check_sources = False
         if implementer_transport == "jules" and check_sources and not force:
             jp = jules_provider or JulesProvider(config)
-            is_avail, sources = jp.is_repo_available(repo)
-            if not is_avail:
-                raise JulesSourceUnauthorizedError(repo, sources)
+            if hasattr(jp, "is_repo_available"):
+                is_avail, sources = jp.is_repo_available(repo)
+                if not is_avail:
+                    raise JulesSourceUnauthorizedError(repo, sources)
 
         goal_id = str(uuid.uuid4())
         ctl = cls(
@@ -299,6 +300,30 @@ class LabeebController:
     def read_events(self) -> list[dict[str, Any]]:
         return self.store.read_events()
 
+    def _write_emergency_report(
+        self,
+        state: dict[str, Any],
+        status: str,
+        *,
+        reason: str = "",
+        evidence: Any = None,
+        error: str = "",
+    ) -> None:
+        """Write minimal emergency fallback report to guarantee terminal persistence."""
+        minimal_report = {
+            "goal_id": self.goal_id,
+            "status": status,
+            "reason": reason,
+            "evidence": evidence,
+            "generated_at": utc_now(),
+            "emergency_fallback": True,
+            "generator_error": error,
+        }
+        state["final_report_ref"] = self.store.write_json(self.paths.final_report_json, minimal_report)
+        md_text = f"# Final Goal Report: {self.goal_id}\n\n**Status**: {status}\n\n**Reason**: {reason}\n\n> Note: Generated via emergency fallback due to report generator error: {error}\n"
+        state["final_report_md_ref"] = self.store.write_text(self.paths.final_report_md, md_text)
+        self.store.append_log(f"EMERGENCY REPORT: Generated minimal fallback report for {status}")
+
     def _require_durable_report(
         self,
         state: dict[str, Any],
@@ -320,6 +345,12 @@ class LabeebController:
             if not state.get("final_report_ref") or not state.get("final_report_md_ref"):
                 raise ControllerError("Final report references missing in state")
         except Exception as exc:
+            retry_cnt = int((state.get("pending_terminal") or {}).get("report_retry_count", 0))
+            if retry_cnt >= 1:
+                self._write_emergency_report(state, status, reason=reason, evidence=evidence, error=str(exc))
+                return
+            if isinstance(state.get("pending_terminal"), dict):
+                state["pending_terminal"]["report_retry_count"] = retry_cnt + 1
             self.store.append_log(f"CRITICAL: Final report generation failed ({status}): {exc}")
             self.record_event(
                 "reporting.failed",
@@ -333,6 +364,14 @@ class LabeebController:
             raise ControllerError(f"Durable report generation failed for terminal status '{status}': {exc}") from exc
 
     def block(self, state: dict[str, Any], reason: str, *, evidence: Any = None) -> None:
+        if not state.get("pending_terminal"):
+            state["pending_terminal"] = {
+                "status": "BLOCKED",
+                "reason": reason,
+                "evidence": evidence,
+                "at": utc_now(),
+            }
+            self.store.save(state)
         self._require_durable_report(state, "BLOCKED", reason=reason, evidence=evidence)
         result = {
             "status": "BLOCKED",
@@ -345,6 +384,7 @@ class LabeebController:
         state["result_ref"] = self.store.write_json(self.paths.results, result)
         state["phase"] = "BLOCKED"
         state["active_task"] = None
+        state.pop("pending_terminal", None)
         pending = state.get("pending_action")
         if isinstance(pending, dict) and pending.get("stage") in {"IN_FLIGHT", "PREPARED", "AMBIGUOUS"}:
             pending["stage"] = "AMBIGUOUS"
@@ -357,6 +397,14 @@ class LabeebController:
         self.record_event("goal.blocked", {"reason": reason})
 
     def fail(self, state: dict[str, Any], reason: str, *, evidence: Any = None) -> None:
+        if not state.get("pending_terminal"):
+            state["pending_terminal"] = {
+                "status": "FAIL",
+                "reason": reason,
+                "evidence": evidence,
+                "at": utc_now(),
+            }
+            self.store.save(state)
         self._require_durable_report(state, "FAIL", reason=reason, evidence=evidence)
         result = {
             "status": "FAIL",
@@ -370,15 +418,26 @@ class LabeebController:
         state["phase"] = "FAIL"
         state["active_task"] = None
         state["pending_action"] = None
+        state.pop("pending_terminal", None)
         self.store.save(state)
         self.store.append_log(f"FAIL: {reason}")
         self.record_event("goal.failed", {"reason": reason})
 
     def pass_goal(self, state: dict[str, Any], decision: dict[str, Any], evidence: dict[str, Any]) -> None:
         reason = str(decision.get("reason") or "Goal acceptance criteria verified")
+        if not state.get("pending_terminal"):
+            state["pending_terminal"] = {
+                "status": "PASS",
+                "reason": reason,
+                "decision": decision,
+                "evidence": evidence,
+                "at": utc_now(),
+            }
+            self.store.save(state)
         self._require_durable_report(state, "PASS", reason=reason, evidence=evidence)
         result = {
             "status": "PASS",
+            "reason": reason,
             "decision": decision,
             "evidence": evidence,
             "at": utc_now(),
@@ -389,12 +448,25 @@ class LabeebController:
         state["phase"] = "PASS"
         state["active_task"] = None
         state["pending_action"] = None
+        state.pop("pending_terminal", None)
         self.store.save(state)
         self.store.append_log("PASS")
         self.record_event("goal.passed", {"decision": decision})
 
     # ----------------------------- brain/critic operations -----------------------------
     def handle_brain_completion(self, state: dict[str, Any]) -> None:
+        if state.get("pending_terminal"):
+            pt = state["pending_terminal"]
+            st = pt.get("status")
+            if st == "PASS":
+                self.pass_goal(state, pt.get("decision") or {"reason": pt.get("reason")}, pt.get("evidence") or {})
+                return
+            elif st == "FAIL":
+                self.fail(state, str(pt.get("reason") or "Terminal failure"), evidence=pt.get("evidence"))
+                return
+            elif st == "BLOCKED":
+                self.block(state, str(pt.get("reason") or "Terminal block"), evidence=pt.get("evidence"))
+                return
         active = state.get("active_task")
         if not isinstance(active, dict) or not active.get("task_id"):
             self.block(state, "THINKING/REVIEWING has no active brain task")
@@ -520,6 +592,18 @@ class LabeebController:
         phase = state["phase"]
         if phase in TERMINAL_PHASES:
             return False
+        if state.get("pending_terminal"):
+            pt = state["pending_terminal"]
+            st = pt.get("status")
+            if st == "PASS":
+                self.pass_goal(state, pt.get("decision") or {"reason": pt.get("reason")}, pt.get("evidence") or {})
+                return True
+            elif st == "FAIL":
+                self.fail(state, str(pt.get("reason") or "Terminal failure"), evidence=pt.get("evidence"))
+                return True
+            elif st == "BLOCKED":
+                self.block(state, str(pt.get("reason") or "Terminal block"), evidence=pt.get("evidence"))
+                return True
         if self.stop_requested():
             self.block(state, "Manual stop requested")
             return True
@@ -599,6 +683,12 @@ class LabeebController:
             state["phase"] = "VALIDATING"
             state["macro_phase"] = "PROVE"
             self.store.save(state)
+            self.record_event("worker.completed", {
+                "session_id": state.get("jules_session_id"),
+                "round": state.get("execution_rounds", 1),
+                "patch_hash": evidence.get("patch_hash"),
+                "files": evidence.get("files") or [],
+            })
             self.record_event("prove.started", {"round": state.get("execution_rounds", 1)})
             return True
 
@@ -691,6 +781,23 @@ class LabeebController:
                     producer="controller",
                     allow_stale_dependency=True,
                 )
+
+        val = evidence.get("validation") or {}
+        val_status = val.get("status")
+        if val_status == "PASS" or val.get("exit_code") == 0:
+            self.record_event("validation.completed", {
+                "status": "PASS",
+                "exit_code": val.get("exit_code", 0),
+                "duration_seconds": val.get("duration_seconds", 0.0),
+                "round": state.get("execution_rounds", 1),
+            })
+        else:
+            self.record_event("validation.failed", {
+                "status": val_status or "FAILED",
+                "exit_code": val.get("exit_code"),
+                "error": val.get("error"),
+                "round": state.get("execution_rounds", 1),
+            })
 
         self.wake_brain_for_event(state, {"type": "IMPLEMENTATION_RESULT", "round": "repair" if state.get("repair_reserved") else "initial"}, evidence)
         return True
