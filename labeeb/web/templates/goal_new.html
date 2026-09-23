@@ -14,11 +14,32 @@
 <div style="max-width: 800px; margin: 0 auto;">
   <form action="/goals/new" method="POST" class="card" style="padding: 28px;">
     
+    {% if error_message %}
+    <div class="impact-panel" style="background: rgba(239, 68, 68, 0.1); border: 1px solid var(--color-fail); padding: 14px 18px; margin-bottom: 20px; border-radius: var(--radius-card);">
+      <div style="display: flex; align-items: flex-start; gap: 10px;">
+        <span class="material-symbols-outlined" style="color: var(--color-fail); font-size: 20px;">error</span>
+        <div style="flex: 1;">
+          <div style="font-weight: 600; color: #fca5a5; margin-bottom: 4px;">Repository Authorization Error</div>
+          <div style="font-size: 12.5px; color: var(--color-paper); line-height: 1.5;">{{ error_message }}</div>
+          <div style="margin-top: 10px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+            <a href="https://jules.google.com/" target="_blank" class="btn btn-secondary btn-sm" style="display: inline-flex; align-items: center; gap: 4px;">
+              <span class="material-symbols-outlined" style="font-size: 14px;">open_in_new</span>
+              <span>Authorize at Google Jules</span>
+            </a>
+            <label style="font-size: 12px; color: var(--color-fog); display: flex; align-items: center; gap: 6px; cursor: pointer;">
+              <input type="checkbox" name="force" value="true"> Force launch anyway (bypass Jules preflight check)
+            </label>
+          </div>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
     <!-- Intent -->
     <div class="form-group">
       <label class="form-label" for="intent">Engineering Intent *</label>
       <textarea id="intent" name="intent" class="form-textarea" rows="4" required
-                placeholder="Describe the engineering goal, expected behavior, and constraints... (e.g. Fix POPS-5750 SQL Injection vulnerability in Search controller and ensure all feature tests pass)"></textarea>
+                placeholder="Describe the engineering goal, expected behavior, and constraints... (e.g. Fix POPS-5750 SQL Injection vulnerability in Search controller and ensure all feature tests pass)">{{ intent or '' }}</textarea>
       <div class="form-hint">The Brain (Codex) will audit the repo against this intent to produce an implementation contract.</div>
     </div>
 
@@ -51,9 +72,14 @@
         </div>
 
         <div class="form-group" style="margin-bottom: 0;">
-          <label class="form-label" for="repo">GitHub Repository (OWNER/REPO) *</label>
-          <input type="text" id="repo" name="repo" class="form-input" style="font-family: var(--font-mono); font-size: 12.5px;" value="{{ default_repo }}" placeholder="e.g. labeeb/backend" required />
-          <div class="form-hint" style="font-size: 11px;">Jules repo boundary.</div>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+            <label class="form-label" for="repo" style="margin-bottom: 0;">GitHub Repository (OWNER/REPO) *</label>
+            <span id="repo-jules-badge" style="font-size: 11px; font-family: var(--font-mono);"></span>
+          </div>
+          <input type="text" id="repo" name="repo" class="form-input" style="font-family: var(--font-mono); font-size: 12.5px;" value="{{ default_repo }}" placeholder="e.g. labeeb/backend" oninput="onRepoInputChange(this.value)" required />
+          <div id="repo-jules-alert" style="margin-top: 4px;"></div>
+          <div id="repo-sources-quickselect" style="margin-top: 4px;"></div>
+          <div class="form-hint" style="font-size: 11px;">Jules repo boundary. Must match an authorized source in Google Jules.</div>
         </div>
       </div>
     </div>

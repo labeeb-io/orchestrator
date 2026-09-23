@@ -44,7 +44,46 @@
 
     {% if goal.result and goal.result.evidence %}
       {% set ev = goal.result.evidence %}
-      {% if ev.error %}
+      {% if ev.authorized_sources is defined or ev.instruction is defined %}
+        <div style="margin-top: 10px; padding: 12px 14px; background: rgba(245, 158, 11, 0.07); border: 1px solid rgba(245, 158, 11, 0.25); border-radius: var(--radius-card); font-size: 13px;">
+          <div style="display: flex; align-items: center; gap: 8px; color: var(--color-amber-gold); font-weight: 600; margin-bottom: 6px;">
+            <span class="material-symbols-outlined" style="font-size: 18px;">admin_panel_settings</span>
+            <span>Google Jules Repository Authorization Required</span>
+          </div>
+          <div style="color: var(--color-paper); margin-bottom: 8px; font-size: 12px; line-height: 1.5;">
+            Repository <code style="padding: 2px 6px; background: rgba(0,0,0,0.35); border-radius: 4px; color: var(--color-paper); font-family: var(--font-mono);">{{ ev.repo }}</code> is not connected to your Google Jules account.
+          </div>
+          {% if ev.authorized_sources %}
+            <div style="font-size: 11px; color: var(--color-mist); margin-bottom: 8px;">
+              Currently authorized sources in your account:
+              <div style="display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px;">
+                {% for s in ev.authorized_sources %}
+                  <span style="display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: 999px; font-family: var(--font-mono); font-size: 11px; color: var(--color-emerald-green);">
+                    <span class="material-symbols-outlined" style="font-size: 12px;">check</span>
+                    {{ s }}
+                  </span>
+                {% endfor %}
+              </div>
+            </div>
+          {% endif %}
+          <div style="display: flex; gap: 10px; align-items: center; margin-top: 8px;">
+            <a href="https://jules.google.com/" target="_blank" rel="noopener noreferrer" class="btn btn-secondary btn-sm" style="display: inline-flex; align-items: center; gap: 5px; text-decoration: none; font-size: 12px; padding: 4px 10px;">
+              <span class="material-symbols-outlined" style="font-size: 14px;">open_in_new</span>
+              <span>Authorize at jules.google.com</span>
+            </a>
+          </div>
+        </div>
+      {% endif %}
+      {% if ev.command_error or ev.stderr %}
+        <details style="margin-top: 8px;">
+          <summary style="cursor: pointer; font-size: 12px; color: var(--color-fog);">Show command failure logs</summary>
+          <div class="code-block" style="margin-top: 6px; font-size: 11px; max-height: 200px; overflow-y: auto;">{{ ev.command_error }}
+{% if ev.stderr %}STDERR:
+{{ ev.stderr }}{% endif %}
+{% if ev.stdout %}STDOUT:
+{{ ev.stdout }}{% endif %}</div>
+        </details>
+      {% elif ev.error %}
         <details style="margin-top: 8px;">
           <summary style="cursor: pointer; font-size: 12px; color: var(--color-fog);">Show raw error details</summary>
           <div class="code-block" style="margin-top: 6px; font-size: 11px; max-height: 200px; overflow-y: auto;">{{ ev.error }}</div>
@@ -90,13 +129,16 @@
         <span>Reconcile Once</span>
       </button>
     {% endif %}
+    {% if goal.controller_pid %}
     <button type="button" class="btn btn-danger btn-sm"
             hx-post="/api/goals/{{ goal.goal_id }}/stop"
             hx-swap="none"
+            onclick="this.innerText='Stopping...'; this.disabled=true;"
             style="display: inline-flex; align-items: center; justify-content: center; gap: 4px;">
       <span class="material-symbols-outlined" style="font-size: 14px;">stop_circle</span>
-      <span>Stop Goal</span>
+      <span>Stop Daemon</span>
     </button>
+    {% endif %}
   </div>
 </div>
 {% endif %}

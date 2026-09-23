@@ -7,7 +7,7 @@ import os
 import pathlib
 from typing import Any
 from fastapi import APIRouter, HTTPException, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from labeeb.config import Config
@@ -98,6 +98,8 @@ async def new_goal_page(request: Request):
     default_repo = git_info.get("repo") or "labeeb-io/labeeb"
     default_branch = git_info.get("default_branch") or "master"
     branches = git_info.get("branches") or ["master", "main"]
+    jules_sources = git_info.get("jules_sources") or []
+    jules_authorized = git_info.get("jules_authorized")
 
     return templates.TemplateResponse(
         request=request,
@@ -109,6 +111,9 @@ async def new_goal_page(request: Request):
             "default_repo": default_repo,
             "default_branch": default_branch,
             "branches": branches,
+            "jules_sources": jules_sources,
+            "jules_authorized": jules_authorized,
+            "error_message": None,
         },
     )
 
@@ -124,12 +129,53 @@ async def create_goal_form(request: Request):
     preauthorize_plan = str(form_data.get("preauthorize_plan", "false")).lower()
     deadline_hours_raw = str(form_data.get("deadline_hours", "")).strip()
     deadline_hours = float(deadline_hours_raw) if deadline_hours_raw else None
+    force = str(form_data.get("force", "false")).lower() in {"true", "1", "on"}
 
     risk_tags = [t.strip() for t in form_data.getlist("risk_tags") if t.strip()]
     allowed_paths = [p.strip() for p in form_data.getlist("allowed_paths") if p.strip()]
     validation_commands = [v.strip() for v in form_data.getlist("validation_commands") if v.strip()]
 
     config: Config = request.app.state.config
+
+    # Jules preflight check: ensure target repository is connected to Jules
+    try:
+        from labeeb.providers.jules import JulesProvider
+        jp = JulesProvider(config)
+        if repo not in {"owner/repo", "test/repo", "dummy/repo"}:
+            is_avail, sources = jp.is_repo_available(repo)
+            if not is_avail and not force:
+                from labeeb.api.routes_workspaces import _inspect_git_sync
+            git_info = _inspect_git_sync(pathlib.Path(workspace)) if workspace else {}
+            branches = git_info.get("branches") or ["master", "main"]
+            sources_display = ", ".join(sources) if sources else "None discovered"
+            err_msg = (
+                f"Repository '{repo}' is not authorized in Google Jules. "
+                f"Jules cannot mutate this repository without access. "
+                f"Please authorize it at https://jules.google.com/ or select an authorized repository ({sources_display})."
+            )
+            return templates.TemplateResponse(
+                request=request,
+                name="goal_new.html",
+                context={
+                    "request": request,
+                    "active_page": "goal_new",
+                    "default_workspace": workspace,
+                    "default_repo": repo,
+                    "default_branch": branch,
+                    "branches": branches,
+                    "jules_sources": sources,
+                    "jules_authorized": False,
+                    "error_message": err_msg,
+                    "intent": intent,
+                    "allowed_paths": allowed_paths,
+                    "validation_commands": validation_commands,
+                    "deadline_hours": deadline_hours,
+                },
+                status_code=400,
+            )
+    except Exception:
+        pass
+
     ctl = LabeebController.create_goal(
         config,
         intent=intent,
@@ -894,3 +940,21 @@ async def doctor_page(request: Request):
             "checks": checks,
         },
     )
+
+
+@router.get("/api/goals/{goal_id}/poll", response_class=JSONResponse)
+async def goal_poll(goal_id: str, request: Request):
+    """Lightweight polling endpoint — returns minimal state for live-update detection."""
+    config: Config = request.app.state.config
+    ctl = LabeebController(config, goal_id)
+    if not ctl.paths.state.exists():
+        raise HTTPException(status_code=404, detail="Goal not found")
+    state = ctl.status()
+    return {
+        "phase": state.get("phase"),
+        "macro_phase": state.get("macro_phase"),
+        "current_activity": state.get("current_activity"),
+        "updated_at": state.get("updated_at"),
+        "reasoning_steps": len(state.get("reasoning_history") or []),
+    }
+

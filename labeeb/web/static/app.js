@@ -235,10 +235,95 @@ const WORKSPACE_PRESETS = {
   },
   'labeeb-orchestrator': {
     workspace: '/home/hany/webserver/server/www/labeeb-orchestrator',
-    repo: 'labeeb-io/labeeb-orchestrator',
-    branch: 'master'
+    repo: 'labeeb-io/orchestrator',
+    branch: 'main'
   }
 };
+
+let cachedJulesSources = [];
+
+// Fetch Jules sources on load if on goal_new page
+async function initJulesSources() {
+  const repoInput = document.getElementById('repo');
+  if (!repoInput) return;
+  try {
+    const res = await fetch('/api/workspaces/jules/sources');
+    const data = await res.json();
+    if (Array.isArray(data.sources)) {
+      cachedJulesSources = data.sources;
+      renderJulesSourcesQuickSelect();
+      validateRepoJulesStatus(repoInput.value);
+    }
+  } catch (e) {
+    // Non-blocking
+  }
+}
+
+function renderJulesSourcesQuickSelect() {
+  const container = document.getElementById('repo-sources-quickselect');
+  if (!container || cachedJulesSources.length === 0) return;
+  container.innerHTML = `
+    <div style="font-size: 11px; color: var(--color-fog); margin-bottom: 3px;">Connected Jules sources:</div>
+    <div style="display: flex; flex-wrap: wrap; gap: 6px;">
+      ${cachedJulesSources.map(s => `
+        <button type="button" class="btn btn-secondary btn-sm" style="padding: 2px 8px; font-size: 11px; font-family: var(--font-mono); height: auto;" onclick="setRepoFromSource('${s}')">
+          <span class="material-symbols-outlined" style="font-size: 12px; vertical-align: middle; margin-right: 2px;">link</span>${s}
+        </button>
+      `).join('')}
+    </div>
+  `;
+}
+
+function setRepoFromSource(sourceRepo) {
+  const repoInput = document.getElementById('repo');
+  if (repoInput) {
+    repoInput.value = sourceRepo;
+    validateRepoJulesStatus(sourceRepo);
+  }
+}
+
+function onRepoInputChange(value) {
+  validateRepoJulesStatus(value);
+}
+
+function validateRepoJulesStatus(repoVal) {
+  const badgeEl = document.getElementById('repo-jules-badge');
+  const alertEl = document.getElementById('repo-jules-alert');
+  if (!badgeEl || !alertEl) return;
+
+  const trimmed = (repoVal || '').trim().toLowerCase().replace(/\.git$/, '');
+  if (!trimmed) {
+    badgeEl.innerHTML = '';
+    alertEl.innerHTML = '';
+    return;
+  }
+
+  if (cachedJulesSources.length === 0) {
+    badgeEl.innerHTML = '<span style="color: var(--color-fog);">Jules source: unchecked</span>';
+    alertEl.innerHTML = '';
+    return;
+  }
+
+  const isAuthorized = cachedJulesSources.some(s => s.toLowerCase().replace(/\.git$/, '') === trimmed);
+  if (isAuthorized) {
+    badgeEl.innerHTML = '<span style="color: var(--color-pass-text); font-weight: 510;">✓ Connected to Jules</span>';
+    alertEl.innerHTML = '';
+  } else {
+    badgeEl.innerHTML = '<span style="color: var(--color-warn-text); font-weight: 510;">⚠️ Not in Jules</span>';
+    alertEl.innerHTML = `
+      <div style="background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.4); padding: 8px 12px; border-radius: 6px; font-size: 11.5px; color: var(--color-paper); line-height: 1.4;">
+        <div style="display: flex; align-items: center; gap: 6px; color: #fbbf24; font-weight: 510; margin-bottom: 3px;">
+          <span class="material-symbols-outlined" style="font-size: 15px;">warning</span>
+          <span>Repository not authorized in Google Jules</span>
+        </div>
+        <div>
+          Jules has not been granted access to <code>${repoVal}</code>. Implementation may fail unless authorized.
+          <a href="https://jules.google.com/" target="_blank" style="color: #60a5fa; text-decoration: underline; margin-left: 4px;">Connect on jules.google.com &nearr;</a>
+        </div>
+      </div>
+    `;
+  }
+}
 
 // Select workspace preset on New Goal page
 function selectWorkspacePreset(presetId) {
@@ -265,7 +350,10 @@ function selectWorkspacePreset(presetId) {
   if (!preset) return;
 
   if (workspaceInput) workspaceInput.value = preset.workspace;
-  if (repoInput) repoInput.value = preset.repo;
+  if (repoInput) {
+    repoInput.value = preset.repo;
+    validateRepoJulesStatus(preset.repo);
+  }
   if (branchSelect && preset.branch) branchSelect.value = preset.branch;
 
   // Inspect the path to confirm real branches from disk
@@ -291,8 +379,13 @@ async function onWorkspacePathChange(path) {
     const data = await res.json();
 
     if (data.valid) {
+      if (Array.isArray(data.jules_sources) && data.jules_sources.length > 0) {
+        cachedJulesSources = data.jules_sources;
+        renderJulesSourcesQuickSelect();
+      }
       if (repoInput && data.repo) {
         repoInput.value = data.repo;
+        validateRepoJulesStatus(data.repo);
       }
       if (branchSelect && Array.isArray(data.branches) && data.branches.length > 0) {
         const curVal = branchSelect.value || data.default_branch || 'master';
@@ -373,6 +466,7 @@ document.addEventListener('DOMContentLoaded', () => {
   if (workspaceInput && workspaceInput.value) {
     onWorkspacePathChange(workspaceInput.value);
   }
+  initJulesSources();
 });
 
 // Re-initialize timeline inspector after HTMX settlements
