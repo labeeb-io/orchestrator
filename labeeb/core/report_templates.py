@@ -213,8 +213,8 @@ def render_markdown(
             nxt = step.get("next_activity") or "-"
             at = step.get("at", "")
             lines.append(f"| {idx} | `{act}` | `{st}` | `{nxt}` | {at} |")
-        else:
-            lines.append("| 1 | *(Direct execution / legacy flow)* | - | - | - |")
+    else:
+        lines.append("| 1 | *(Direct execution / legacy flow)* | - | - | - |")
 
     # Section 7: Reality Audit & Diagnosis
     lines.extend([

@@ -6,7 +6,7 @@ import shutil
 import sys
 from typing import Any
 
-from labeeb.config import Config, executable, role_config
+from labeeb.config import Config, executable, expand, role_config
 from labeeb.models import VERSION
 from labeeb.providers.base import run_cmd
 
@@ -18,7 +18,7 @@ def doctor(config: Config) -> dict[str, Any]:
         "python": sys.version.split()[0],
         "config": str(config.path),
         "executables": {},
-        "state_root": str(pathlib.Path(config.get("controller.state_root", "~/.local/state/labeeb-controller")).expanduser()),
+        "state_root": expand(str(config.get("controller.state_root", "~/.local/state/labeeb-controller"))),
     }
     for key, fallback, version_args in (
         ("orchestrator", "orchestrator", ["--version"]),
@@ -41,7 +41,7 @@ def doctor(config: Config) -> dict[str, Any]:
             "read_only_default": role.get("read_only", False),
         }
         if role.get("transport") == "direct" and isinstance(role.get("command"), list) and role.get("command"):
-            critic_exe = str(pathlib.Path(role["command"][0]).expanduser())
+            critic_exe = expand(str(role["command"][0]))
             critic_check["executable"] = shutil.which(critic_exe) or critic_exe
             critic_check["executable_found"] = bool(shutil.which(critic_exe) or pathlib.Path(critic_exe).exists())
         checks["critic"] = critic_check
@@ -50,7 +50,7 @@ def doctor(config: Config) -> dict[str, Any]:
     try:
         implementer_name = str(config.get("workflow.implementer_role", "implementer"))
         implementer = role_config(config, implementer_name)
-        impl_exe = str(pathlib.Path(implementer.get("command", config.get("executables.cjules", "cjules"))).expanduser())
+        impl_exe = expand(str(implementer.get("command", config.get("executables.cjules", "cjules"))))
         checks["implementer"] = {
             "role": implementer_name,
             "transport": implementer.get("transport"),
