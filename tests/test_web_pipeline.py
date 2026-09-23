@@ -9,7 +9,7 @@ from fastapi.testclient import TestClient
 
 from labeeb.api.app import create_app
 from labeeb.config import load_config
-from labeeb.core.artifacts import AUTHORITY_CONTEXT, GOAL_CONTRACT, PROOF_CONTRACT
+from labeeb.core.artifacts import GOAL_CONTRACT
 from labeeb.core.controller import LabeebController
 
 BASE_CONFIG = r"""
@@ -142,6 +142,7 @@ class WebPipelineTests(unittest.TestCase):
             data={"observable_outcome": "Tests pass cleanly"},
             producer="brain",
         )
+        self.ctl.store.save(state)
 
         # 1. Test listing artifacts
         resp = self.client.get(f"/api/goals/{self.goal_id}/artifacts")

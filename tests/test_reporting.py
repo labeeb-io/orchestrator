@@ -7,12 +7,12 @@ from typing import Any
 import pytest
 
 from labeeb.config import Config
+from labeeb.errors import ControllerError
 from labeeb.core.artifacts import (
     AUTHORITY_CONTEXT,
     BASELINE_RESULT,
     FINAL_REPORT,
     GOAL_CONTRACT,
-    GOAL_PROOF,
     PROOF_CONTRACT,
     REALITY_AUDIT,
     SOLUTION_CANDIDATES,
@@ -20,11 +20,7 @@ from labeeb.core.artifacts import (
 from labeeb.core.controller import LabeebController
 from labeeb.core.reporting import FinalReportGenerator
 from labeeb.models import (
-    ArtifactStatus,
-    ArtifactValidity,
     PathIntegrityStatus,
-    ReasoningActivity,
-    ReasoningDecisionAction,
 )
 from labeeb.storage.goal_store import read_ref_json
 
@@ -265,3 +261,161 @@ def test_baseline_shortcut_final_report(controller):
     md_text = controller.paths.final_report_md.read_text(encoding="utf-8")
     assert 'terminal_path: "BASELINE_SHORTCUT"' in md_text
     assert "Zero code mutations applied: baseline shortcut verified original code satisfied requirements" in md_text
+
+
+def test_terminal_result_aborts_if_report_generation_fails(controller):
+    """P0 regression: Terminal results must require durable reports.
+
+    If report generation fails, result.json must NOT be written, state phase must NOT
+    be set to terminal status, and no recursive block/fail calls must occur.
+    """
+    state = controller.store.load()
+    _populate_test_goal(controller, state)
+
+    # Force report generation to fail
+    def _exploding_generate(*args, **kwargs):
+        raise OSError("Simulated disk I/O failure during report write")
+
+    controller.report_generator.generate_and_save = _exploding_generate
+
+    # Attempt to fail the goal
+    with pytest.raises(ControllerError, match="Durable report generation failed"):
+        controller.fail(state, "A planned failure reason")
+
+    # Verify safe failure invariants
+    assert not controller.paths.results.exists(), "result.json must not be written if reporting fails"
+    assert state.get("phase") != "FAIL", "State phase must not be set to terminal FAIL"
+    assert state.get("result_ref") is None, "State result_ref must remain None"
+
+    # Event logged
+    events = controller.store.read_events()
+    assert any(e.get("event_type") == "reporting.failed" for e in events)
+
+
+def test_final_report_populates_from_v2_goal_contract_and_evidence(controller):
+    """P1 regression: Populate final report from real nested contract and Phase 5 evidence."""
+    state = controller.store.load()
+
+    # Nested goal_contract in contract.json
+    contract = read_ref_json(state["contract_ref"])
+    contract["goal_contract"] = {
+        "observable_outcome": "Nested: CLI displays progress bar",
+        "expected_behavior": "Nested: Progress bar renders smoothly",
+        "current_behavior": "Nested: CLI output is completely silent",
+        "acceptance_criteria": [
+            "Nested: Progress bar animation reaches 100%",
+            "Nested: No flicker in terminal",
+        ],
+        "constraints": ["Nested: Standard library only"],
+        "non_goals": ["Nested: Web GUI rendering"],
+    }
+    state["contract_ref"] = controller.store.write_json(controller.paths.contract, contract)
+
+    # Write Phase 5 artifacts
+    write = controller.artifact_store.write_artifact
+    write(state, AUTHORITY_CONTEXT, {}, "controller")
+    write(state, GOAL_CONTRACT, contract["goal_contract"], "brain")
+    write(state, PROOF_CONTRACT, {"entrypoint": "python -m unittest tests/test_ui.py"}, "brain")
+    write(state, REALITY_AUDIT, {"scanned_files": ["ui.py"]}, "brain")
+    write(state, BASELINE_RESULT, {"status": "FAIL", "exit_code": 2}, "brain")
+    write(
+        state,
+        "diagnosis",
+        {
+            "root_cause": "Buffer flush not called after write",
+            "failure_symptoms": ["Silent stdout", "Zero byte output"],
+            "causal_chain": ["sys.stdout.write without sys.stdout.flush"],
+        },
+        "brain",
+    )
+    write(
+        state,
+        "solution_candidates",
+        {
+            "selected_approach": "Call sys.stdout.flush() on tick",
+            "rejected_alternatives": ["Switch to print() with flush=True", "Custom curses UI"],
+            "trade_offs": "Minimal overhead, zero dependencies",
+        },
+        "brain",
+    )
+    write(
+        state,
+        "change_authority",
+        {
+            "classification": "LOCAL",
+            "justification": "Touches only ui.py within allowed_paths",
+            "allowed_paths": ["src", "tests"],
+        },
+        "brain",
+    )
+    write(
+        state,
+        "critic_review",
+        {
+            "verdict": "ACCEPTED_WITH_CONVERGENCE",
+            "findings": ["Ensure Windows console supports ANSI escapes"],
+            "resolutions": "Handled with colorama fallback check",
+        },
+        "critic",
+    )
+    write(
+        state,
+        "goal_proof",
+        {
+            "entrypoint": "python -m unittest tests/test_ui.py",
+            "proof_passed": True,
+            "entrypoint_exit_code": 0,
+            "path_integrity_status": PathIntegrityStatus.ORIGINAL,
+        },
+        "controller",
+    )
+
+    state["reasoning_history"] = [
+        {"activity": "authority_context", "status": "SATISFIED", "at": "2026-09-23T00:00:00Z"},
+        {"activity": "diagnosis", "status": "SATISFIED", "at": "2026-09-23T00:01:00Z"},
+    ]
+
+    evidence = {
+        "validation": {
+            "status": "PASS",
+            "exit_code": 0,
+            "duration_seconds": 1.2,
+            "commands": ["python -m unittest tests/test_ui.py"],
+            "stdout": "OK",
+            "stderr": "",
+        },
+        "goal_proof": {
+            "entrypoint": "python -m unittest tests/test_ui.py",
+            "proof_passed": True,
+            "entrypoint_exit_code": 0,
+            "path_integrity_status": PathIntegrityStatus.ORIGINAL,
+        },
+    }
+
+    controller.pass_goal(state, {"reason": "Verified UI progress"}, evidence)
+
+    report_json = read_ref_json(state["final_report_ref"])
+    cs = report_json["contract_summary"]
+    assert cs["observable_outcome"] == "Nested: CLI displays progress bar"
+    assert cs["expected_behavior"] == "Nested: Progress bar renders smoothly"
+    assert cs["current_behavior"] == "Nested: CLI output is completely silent"
+    assert "Nested: Progress bar animation reaches 100%" in cs["acceptance_criteria"]
+
+    p5 = report_json["phase5_evidence"]
+    assert p5["diagnosis"]["root_cause"] == "Buffer flush not called after write"
+    assert "Silent stdout" in p5["diagnosis"]["failure_symptoms"]
+    assert p5["solution_candidates"]["selected_approach"] == "Call sys.stdout.flush() on tick"
+    assert len(p5["solution_candidates"]["rejected_alternatives"]) == 2
+    assert p5["change_authority"]["classification"] == "LOCAL"
+    assert p5["goal_proof"]["proof_passed"] is True
+    assert p5["goal_proof"]["entrypoint"] == "python -m unittest tests/test_ui.py"
+    assert "Ensure Windows console supports ANSI escapes" in p5["critic_findings"]["findings"]
+    assert "Baseline: FAIL (exit code 2) -> Final: PASS (exit code 0)" in p5["baseline_delta"]["summary"]
+
+    md_text = controller.paths.final_report_md.read_text(encoding="utf-8")
+    assert "Buffer flush not called after write" in md_text
+    assert "Call sys.stdout.flush() on tick" in md_text
+    assert "Switch to print() with flush=True" in md_text
+    assert "Ensure Windows console supports ANSI escapes" in md_text
+    assert "Baseline: FAIL (exit code 2) -> Final: PASS (exit code 0)" in md_text
+

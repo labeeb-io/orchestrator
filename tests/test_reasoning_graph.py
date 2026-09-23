@@ -44,9 +44,22 @@ def test_activity_transition_validation():
     # Valid forward transitions
     assert validate_activity_transition(ReasoningActivity.AUTHORITY_CONTEXT, ReasoningActivity.GOAL_CONTRACT)
     assert validate_activity_transition(ReasoningActivity.GOAL_CONTRACT, ReasoningActivity.PRODUCT_VALIDATION)
+    assert validate_activity_transition(ReasoningActivity.GOAL_CONTRACT, ReasoningActivity.PROOF_CONTRACT)  # headless skip
     assert validate_activity_transition(ReasoningActivity.PRODUCT_VALIDATION, ReasoningActivity.PROOF_CONTRACT)
     assert validate_activity_transition(ReasoningActivity.REALITY_AUDIT, ReasoningActivity.BASELINE)
+    assert validate_activity_transition(ReasoningActivity.MUTATION_PREFLIGHT, ReasoningActivity.DIAGNOSIS)  # baseline skip
     assert validate_activity_transition(ReasoningActivity.SOLUTION_EXPLORATION, ReasoningActivity.SECOND_REALITY_AUDIT)
+    assert validate_activity_transition(ReasoningActivity.SECOND_REALITY_AUDIT, ReasoningActivity.INDEPENDENT_CRITIQUE)
+    assert validate_activity_transition(ReasoningActivity.SECOND_REALITY_AUDIT, ReasoningActivity.CHANGE_AUTHORITY)
+
+    # Valid self-transitions (refinement / multi-turn)
+    assert validate_activity_transition(ReasoningActivity.SOLUTION_EXPLORATION, ReasoningActivity.SOLUTION_EXPLORATION)
+    assert validate_activity_transition(ReasoningActivity.REALITY_AUDIT, ReasoningActivity.REALITY_AUDIT)
+
+    # Valid transitions using AGENTS.md aliases
+    assert validate_activity_transition("second_audit", "critic_review")
+    assert validate_activity_transition("solution_candidates", "second_audit")
+    assert validate_activity_transition("baseline_result", "diagnosis")
 
     # Valid backward transitions
     assert validate_activity_transition(ReasoningActivity.SECOND_REALITY_AUDIT, ReasoningActivity.REALITY_AUDIT)
@@ -356,3 +369,70 @@ def test_human_checkpoint_decision(temp_dir):
     # Goal pauses at PLAN_GATE
     assert state["phase"] == "PLAN_GATE"
     assert state.get("human_checkpoint", {}).get("question") == "Should monthly tier include unlimited search?"
+
+
+def test_jules_prompt_synthesis_from_execution_contract_data(temp_dir):
+    raw_cfg = {
+        "controller": {"state_root": str(temp_dir)},
+        "roles": {
+            "brain": {"transport": "orchestrator", "runtime": "codex"},
+            "critic": {"transport": "direct", "command": ["false"]},
+            "implementer": {"transport": "jules", "command": "cjules"},
+        },
+    }
+    config = Config(temp_dir / "config.toml", raw_cfg)
+    ctl = LabeebController.create_goal(
+        config,
+        intent="Test prompt synthesis",
+        workspace=str(temp_dir),
+        repo="owner/repo",
+        branch="main",
+        risk_tags=[],
+        allowed_paths=["tests/test_smoke_env.py"],
+        validation_commands=["pytest tests/test_smoke_env.py"],
+        preauthorize_plan=True,
+    )
+    state = ctl.store.load()
+
+    # Emulate decision envelope as returned in session 1050ccca:
+    # no top-level "execution.jules_prompt", but full details inside produced_artifact.data
+    decision = {
+        "decision": "IMPLEMENTATION_READY",
+        "current_activity": "execution_contract",
+        "activity_status": "SATISFIED",
+        "next_activity": None,
+        "reason": "Execution is fully bounded and preauthorized.",
+        "produced_artifact": {
+            "artifact_type": "execution_contract",
+            "data": {
+                "goal": "Create smoke test for environment sanity.",
+                "approved_direction": "Create tests/test_smoke_env.py using unittest.",
+                "implementation": [
+                    "Import unittest",
+                    "Assert sys.version_info >= (3, 10)",
+                ],
+                "allowed_paths": ["tests/test_smoke_env.py"],
+                "validation_commands": ["pytest tests/test_smoke_env.py"],
+                "acceptance_criteria": [
+                    "The authorized file exists.",
+                    "Validation command exits 0.",
+                ],
+            },
+        },
+    }
+
+    handle_reasoning_decision(ctl, state, decision)
+
+    # Verify plan was written and jules_prompt was synthesized
+    from labeeb.storage.goal_store import read_ref_json
+    plan = read_ref_json(state["plan_ref"])
+    assert plan is not None
+    assert "execution" in plan
+    prompt = plan["execution"].get("jules_prompt")
+    assert prompt is not None
+    assert "Goal:\nCreate smoke test" in prompt
+    assert "Implementation Steps:" in prompt
+    assert "Assert sys.version_info" in prompt
+    assert "Acceptance Criteria:" in prompt
+    assert state.get("phase") != "BLOCKED"
+

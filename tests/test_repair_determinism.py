@@ -2,6 +2,7 @@
 import pathlib
 from unittest.mock import MagicMock, patch
 
+import json
 from labeeb.config import Config
 from labeeb.core.effects import EffectManager
 from labeeb.core.events import (
@@ -11,7 +12,8 @@ from labeeb.core.events import (
     meaningful_event,
 )
 from labeeb.core.repair import maybe_handle_repair_activation_timeout
-from labeeb.errors import AmbiguousEffect
+from labeeb.errors import AmbiguousEffect, CommandError
+from labeeb.models import CmdResult
 from labeeb.providers.jules import JulesProvider
 from labeeb.storage.goal_store import GoalPaths, GoalStore
 
@@ -293,6 +295,135 @@ class TestTask18StrictJulesCreateReconciliation:
         assert len(blocked_calls) == 1
         assert "lacks required repo, branch, or marker metadata" in blocked_calls[0][0]
 
+    def test_reconcile_jules_create_surfaces_command_error_when_no_matches(self, tmp_path):
+        paths = GoalPaths(tmp_path / "g1")
+        store = GoalStore(paths)
+        store.init_dirs()
+        config = make_config()
+        orchestrator = MagicMock()
+        jules = MagicMock()
+        jules.find_sessions.return_value = []
+        em = EffectManager(config, paths, store, orchestrator, jules)
+
+        state = {"goal_id": "g1", "phase": "EFFECT"}
+        action = em.prepare_effect(
+            state,
+            "jules_create",
+            {"marker": "[TEST]", "repo": "labeeb-io/orchestrator", "branch": "main"},
+            "WAITING_JULES",
+        )
+        em.mark_in_flight(state)
+
+        cmd_err = CommandError(
+            "Command failed (1): cjules new ...",
+            cmd=["cjules", "new"],
+            rc=1,
+            stdout="",
+            stderr="Source 'sources/github/labeeb-io/orchestrator' not found",
+        )
+        jules.is_repo_available.return_value = (True, ["labeeb-io/orchestrator"])
+
+        blocked_calls = []
+        em.reconcile_effect(
+            state,
+            action,
+            command_error=cmd_err,
+            on_block=lambda r, ev: blocked_calls.append((r, ev)),
+        )
+
+        assert len(blocked_calls) == 1
+        reason, evidence = blocked_calls[0]
+        assert "Jules create failed" in reason
+        assert "Command failed (1)" in reason
+        assert evidence["stderr"] == "Source 'sources/github/labeeb-io/orchestrator' not found"
+        assert evidence["marker"] == "[TEST]"
+
+    def test_reconcile_jules_create_blocks_as_ambiguous_when_no_error_and_no_matches(self, tmp_path):
+        paths = GoalPaths(tmp_path / "g1")
+        store = GoalStore(paths)
+        store.init_dirs()
+        config = make_config()
+        orchestrator = MagicMock()
+        jules = MagicMock()
+        jules.find_sessions.return_value = []
+        em = EffectManager(config, paths, store, orchestrator, jules)
+
+        state = {"goal_id": "g1", "phase": "EFFECT"}
+        action = em.prepare_effect(
+            state,
+            "jules_create",
+            {"marker": "[TEST]", "repo": "labeeb-io/orchestrator", "branch": "main"},
+            "WAITING_JULES",
+        )
+        em.mark_in_flight(state)
+
+        jules.is_repo_available.return_value = (True, [])
+        blocked_calls = []
+        em.reconcile_effect(
+            state,
+            action,
+            command_error=None,
+            on_block=lambda r, ev: blocked_calls.append((r, ev)),
+        )
+
+        assert len(blocked_calls) == 1
+        reason, evidence = blocked_calls[0]
+        assert "Ambiguous Jules create: expected exactly one matching session, found 0" in reason
+
+    def test_reconcile_jules_create_blocks_with_unauthorized_source_when_repo_not_in_sources(self, tmp_path):
+        paths = GoalPaths(tmp_path / "g1")
+        store = GoalStore(paths)
+        store.init_dirs()
+        config = make_config()
+        orchestrator = MagicMock()
+        jules = MagicMock()
+        jules.find_sessions.return_value = []
+        jules.is_repo_available.return_value = (False, ["labeeb-io/labeeb"])
+        em = EffectManager(config, paths, store, orchestrator, jules)
+
+        state = {"goal_id": "g1", "phase": "EFFECT"}
+        action = em.prepare_effect(
+            state,
+            "jules_create",
+            {"marker": "[TEST]", "repo": "labeeb-io/orchestrator", "branch": "main"},
+            "WAITING_JULES",
+        )
+        em.mark_in_flight(state)
+
+        blocked_calls = []
+        em.reconcile_effect(
+            state,
+            action,
+            command_error=None,
+            on_block=lambda r, ev: blocked_calls.append((r, ev)),
+        )
+
+        assert len(blocked_calls) == 1
+        reason, evidence = blocked_calls[0]
+        assert "not authorized in Google Jules" in reason
+        assert evidence["repo"] == "labeeb-io/orchestrator"
+        assert evidence["authorized_sources"] == ["labeeb-io/labeeb"]
+
+    def test_jules_provider_list_sources_and_availability(self):
+        config = make_config()
+        jules = JulesProvider(config)
+        sources_payload = [
+            {"name": "sources/github/labeeb-io/labeeb"},
+            {"source": "sources/github/another/project"},
+        ]
+        with patch("labeeb.providers.jules.run_cmd") as mock_cmd:
+            mock_cmd.return_value = CmdResult(cmd=[], rc=0, stdout=json.dumps(sources_payload), stderr="")
+            sources = jules.list_sources()
+            assert "labeeb-io/labeeb" in sources
+            assert "another/project" in sources
+
+            is_avail, src_list = jules.is_repo_available("labeeb-io/labeeb")
+            assert is_avail is True
+            assert src_list == sources
+
+            is_avail_unavail, _ = jules.is_repo_available("labeeb-io/orchestrator")
+            assert is_avail_unavail is False
+
 
 class TestTask19ProvenJulesApproval:
     def test_reconcile_jules_approve_requires_plan_approved_activity(self, tmp_path):
@@ -429,3 +560,26 @@ class TestTask20BoundedBrainTaskReconciliation:
 
         assert len(blocked_calls) == 1
         assert "multiple tasks found with name goal-1-brain" in blocked_calls[0][0]
+
+
+class TestCLIFormattingAndReconcile:
+    def test_format_cli_error_for_jules_source_unauthorized(self):
+        from labeeb.cli.main import format_cli_error
+        from labeeb.errors import JulesSourceUnauthorizedError
+
+        err = JulesSourceUnauthorizedError("my-org/unauthorized-repo", ["my-org/valid-repo-1", "my-org/valid-repo-2"])
+        formatted = format_cli_error(err)
+        assert "Google Jules Repository Check" in formatted
+        assert "Repository Unauthorized: my-org/unauthorized-repo" in formatted
+        assert "my-org/valid-repo-1" in formatted
+        assert "https://jules.google.com/" in formatted
+        assert "--force" in formatted
+
+    def test_format_cli_error_for_generic_controller_error(self):
+        from labeeb.cli.main import format_cli_error
+        from labeeb.errors import ControllerError
+
+        err = ControllerError("Something went wrong in controller")
+        formatted = format_cli_error(err)
+        assert "Labeeb Controller Error" in formatted
+        assert "Something went wrong in controller" in formatted

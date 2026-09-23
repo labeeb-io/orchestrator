@@ -103,6 +103,7 @@ def _write_full_reasoning_chain(ctl: LabeebController, state: dict[str, Any]) ->
     write(state, CHANGE_AUTHORITY, {"classification": "LOCAL"}, "brain")
     write(state, IMPLEMENTATION_READINESS, {"ready": True}, "brain")
     write(state, EXECUTION_CONTRACT, {"prompt": "bounded prompt"}, "brain")
+    state["reasoning_graph_active"] = True
 
 
 def test_execution_rounds_tracking_and_cap(controller):
@@ -128,7 +129,7 @@ def test_execution_rounds_tracking_and_cap(controller):
     state.pop("pending_action", None)
     controller.dispatch_jules(state)
     assert state["phase"] == "FAIL"
-    assert "Execution rounds exhausted" in state.get("result", {}).get("reason", "")
+    assert "Execution rounds exhausted" in read_ref_json(state["result_ref"])["reason"]
 
 
 def test_return_to_thinking_preserves_repair_budget(controller):
@@ -183,7 +184,7 @@ def test_return_to_thinking_preserves_repair_budget(controller):
 
     # Event logged
     events = controller.store.read_events()
-    assert any(e.get("event") == "reasoning.returned_to_thinking" for e in events)
+    assert any(e.get("event_type") == "reasoning.returned_to_thinking" for e in events)
 
 
 def test_return_to_thinking_fails_when_execution_rounds_exhausted(controller):
@@ -206,7 +207,7 @@ def test_return_to_thinking_fails_when_execution_rounds_exhausted(controller):
     )
 
     assert state["phase"] == "FAIL"
-    assert "maximum execution rounds" in state.get("result", {}).get("reason", "")
+    assert "maximum execution rounds" in read_ref_json(state["result_ref"])["reason"].lower()
 
 
 def test_targeted_repair_budget_exhaustion(controller):
@@ -216,6 +217,7 @@ def test_targeted_repair_budget_exhaustion(controller):
     state["phase"] = "REVIEW"
     state["repair_reserved"] = False
     state["jules_session_id"] = "test-jules-session"
+    controller.jules.get_logs = lambda sid: {"activities": [{"id": "act-1"}]}
 
     # Turn 1: First repair is permitted and reserves the single repair budget
     handle_review_decision(
@@ -242,7 +244,7 @@ def test_targeted_repair_budget_exhaustion(controller):
     )
 
     assert state["phase"] == "FAIL"
-    assert "single V1 repair budget was consumed" in state.get("result", {}).get("reason", "")
+    assert "single V1 repair budget was consumed" in read_ref_json(state["result_ref"])["reason"]
 
 
 def test_baseline_shortcut_records_goal_proof(controller):
@@ -273,14 +275,15 @@ def test_baseline_shortcut_records_goal_proof(controller):
 
     proof_entry = state["artifacts"][GOAL_PROOF]
     assert proof_entry["validity"] == ArtifactValidity.VALID
-    proof_data = read_ref_json(proof_entry["ref"])
+    proof_payload = read_ref_json(proof_entry["ref"])
+    proof_data = proof_payload.get("data", proof_payload)
     assert proof_data["proof_passed"] is True
     assert proof_data["terminal_path"] == "BASELINE_SHORTCUT"
     assert proof_data["execution_rounds"] == 0
     assert proof_data["path_integrity_status"] == PathIntegrityStatus.ORIGINAL
 
 
-def test_goal_proof_artifact_generation_in_validating(controller):
+def test_goal_proof_artifact_generation_in_validating(controller, monkeypatch):
     state = controller.store.load()
     _setup_approved_plan(controller, state)
     _write_full_reasoning_chain(controller, state)
@@ -296,18 +299,30 @@ def test_goal_proof_artifact_generation_in_validating(controller):
     patch_path.write_text("--- a/src/main.py\n+++ b/src/main.py\n@@ -1 +1 @@\n-old\n+new\n")
     state["patch_ref"] = f"file:{patch_path}"
 
-    # Mock validation runner by patching run_validation
-    def _mock_validation(contract, plan, patch_file, worktree):
-        return {
+    evidence = {
+        "patch_ref": state["patch_ref"],
+        "patch_hash": "sha256-test",
+        "files": ["src/main.py"],
+        "base_commit": "HEAD",
+        "validation": {
             "status": "PASS",
             "exit_code": 0,
             "commands": ["true"],
             "stdout": "All tests passed",
             "stderr": "",
             "duration_seconds": 1.2,
-        }
+        },
+        "goal_proof": {
+            "entrypoint": "pytest tests/test_smoke.py",
+            "proof_passed": True,
+            "entrypoint_exit_code": 0,
+            "path_integrity_status": PathIntegrityStatus.ORIGINAL,
+        },
+    }
+    state["review_ref"] = controller.store.write_json(controller.paths.reviews / "test-review.json", evidence)
 
-    controller.run_validation = _mock_validation
+    # Mock validate_evidence in controller to return pre-computed evidence
+    monkeypatch.setattr("labeeb.core.controller.validate_evidence", lambda *args, **kwargs: evidence)
 
     # Execute step_validating
     res = controller.step_validating(state)
@@ -320,9 +335,141 @@ def test_goal_proof_artifact_generation_in_validating(controller):
 
     proof_entry = state["artifacts"][GOAL_PROOF]
     assert proof_entry["validity"] == ArtifactValidity.VALID
-    proof_data = read_ref_json(proof_entry["ref"])
+    proof_payload = read_ref_json(proof_entry["ref"])
+    proof_data = proof_payload.get("data", proof_payload)
     assert proof_data["proof_passed"] is True
     assert proof_data["validation_status"] == "PASS"
     assert proof_data["validation_exit_code"] == 0
     assert proof_data["execution_rounds"] == 1
     assert proof_data["repair_reserved"] is False
+
+
+def test_goal_proof_failure_blocks_pass_even_when_validation_passes(controller):
+    """P0 regression: General validation passes, but goal proof fails -> PASS must be BLOCKED."""
+    state = controller.store.load()
+    _setup_approved_plan(controller, state)
+    _write_full_reasoning_chain(controller, state)
+
+    state["macro_phase"] = "PROVE"
+    state["phase"] = "REVIEW"
+    state["execution_rounds"] = 1
+
+    evidence = {
+        "validation": {
+            "status": "PASS",
+            "exit_code": 0,
+            "commands": ["true"],
+        },
+        "goal_proof": {
+            "proof_passed": False,
+            "entrypoint": "python -m unittest tests/test_smoke.py",
+            "entrypoint_exit_code": 1,
+            "reason": "Proof entrypoint exited with code 1",
+            "path_integrity_status": PathIntegrityStatus.ORIGINAL,
+        },
+    }
+    state["review_ref"] = controller.store.write_json(controller.paths.reviews / "test-review-gp-fail.json", evidence)
+
+    # Brain attempts to PASS
+    handle_review_decision(
+        controller,
+        state,
+        {
+            "action": "PASS",
+            "reason": "All good from brain perspective",
+        },
+    )
+
+    # Must be BLOCKED, cannot PASS
+    assert state["phase"] == "BLOCKED"
+    last_event = controller.store.read_events()[-1]
+    event_reason = str(last_event.get("data", {}).get("reason", ""))
+    assert "goal proof failed" in event_reason.lower() or "goal proof failed" in state.get("blocked_action", {}).get("reason", "").lower()
+
+
+def test_missing_or_stale_proof_contract_blocks_pass(controller):
+    """P0 regression: Missing or stale proof contract must not produce a passing proof artifact."""
+    state = controller.store.load()
+    _setup_approved_plan(controller, state)
+    _write_full_reasoning_chain(controller, state)
+
+    state["macro_phase"] = "PROVE"
+    state["phase"] = "REVIEW"
+    state["execution_rounds"] = 1
+
+    # Proof contract marked STALE
+    state["artifacts"][PROOF_CONTRACT]["validity"] = ArtifactValidity.STALE
+
+    evidence = {
+        "validation": {"status": "PASS", "exit_code": 0, "commands": ["true"]},
+        "goal_proof": {
+            "proof_passed": False,
+            "reason": "Proof contract artifact is STALE or invalid",
+            "path_integrity_status": PathIntegrityStatus.ORIGINAL,
+        },
+    }
+    state["review_ref"] = controller.store.write_json(controller.paths.reviews / "test-review-stale.json", evidence)
+
+    handle_review_decision(controller, state, {"action": "PASS"})
+    assert state["phase"] == "BLOCKED"
+
+
+def test_execution_rounds_includes_repair_and_enforces_ceiling(controller):
+    """P1 regression: Count actual execution rounds including repair and enforce max-2 ceiling."""
+    state = controller.store.load()
+    _setup_approved_plan(controller, state)
+
+    assert state.get("execution_rounds", 0) == 0
+
+    # 1. First execution round via initial Jules dispatch
+    controller.dispatch_jules(state)
+    assert state["execution_rounds"] == 1
+    assert state.get("repair_reserved", False) is False
+
+    # Simulate completed Jules work and state in REVIEW
+    state["macro_phase"] = "PROVE"
+    state["phase"] = "REVIEW"
+    state["jules_session_id"] = "session-123"
+    state.pop("pending_action", None)
+
+    # 2. Targeted repair sent to existing session -> execution_rounds must increment to 2
+    # Mock jules.get_logs so reserve_and_send_repair succeeds
+    controller.jules.get_logs = lambda sid: {"activities": [{"id": "act-1"}]}
+
+    handle_review_decision(
+        controller,
+        state,
+        {
+            "action": "REPAIR",
+            "repair_message": "Fix edge-case off-by-one bug",
+        },
+    )
+
+    assert state["execution_rounds"] == 2
+    assert state["repair_reserved"] is True
+    assert state["pending_action"]["kind"] == "jules_message"
+
+    # 3. Attempting extra execution:
+    # A) Attempting another repair when ceiling is reached (and repair already reserved) -> fails
+    state["macro_phase"] = "PROVE"
+    state["phase"] = "REVIEW"
+    state.pop("pending_action", None)
+
+    handle_review_decision(
+        controller,
+        state,
+        {
+            "action": "REPAIR",
+            "repair_message": "Fix another bug",
+        },
+    )
+    assert state["phase"] == "FAIL"
+
+    # B) Attempting another dispatch when execution_rounds == 2 -> fails
+    state2 = controller.store.load()
+    _setup_approved_plan(controller, state2)
+    state2["execution_rounds"] = 2
+    controller.dispatch_jules(state2)
+    assert state2["phase"] == "FAIL"
+    assert "Execution rounds exhausted" in read_ref_json(state2["result_ref"])["reason"]
+
