@@ -155,6 +155,53 @@ class WebUITests(unittest.TestCase):
         self.assertIn("Timeline &amp; Events", resp.text)
         self.assertIn("Contract &amp; Plan", resp.text)
 
+    def test_artifact_activity_status_rendering(self):
+        from labeeb.core.controller import LabeebController
+        ctl = LabeebController.create_goal(
+            self.config,
+            intent="Test artifact status rendering",
+            workspace=str(self.root / "repo"),
+            repo="owner/repo",
+            branch="main",
+            risk_tags=[],
+            allowed_paths=[],
+            validation_commands=["true"],
+            preauthorize_plan=True,
+        )
+        state = ctl.store.load()
+        # Write an artifact with NOT_APPLICABLE activity_status
+        ctl.artifact_store.write_artifact(
+            state,
+            "product_contract",
+            {"status": "NOT_APPLICABLE"},
+            "brain",
+            activity_status="NOT_APPLICABLE",
+            not_applicable_reason="Backend only task",
+        )
+        # Write an artifact with SATISFIED activity_status
+        ctl.artifact_store.write_artifact(
+            state,
+            "authority_context",
+            {"workspace": str(self.root / "repo")},
+            "controller",
+            activity_status="SATISFIED",
+        )
+        state["current_activity"] = "goal_contract"
+        ctl.store.save(state)
+
+        resp = self.client.get(f"/goals/{ctl.goal_id}")
+        self.assertEqual(resp.status_code, 200)
+        html = resp.text
+
+        # Verify Artifacts Vault table rendering
+        self.assertIn("N/A", html)
+        self.assertIn("Satisfied", html)
+
+        # Verify Reasoning Activity Drawer chip classes
+        self.assertIn("activity-chip satisfied", html)
+        self.assertIn("activity-chip na", html)
+
 
 if __name__ == "__main__":
     unittest.main()
+

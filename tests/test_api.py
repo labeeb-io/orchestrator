@@ -219,6 +219,68 @@ class APITests(unittest.TestCase):
         self.assertIn("Visual Summary &amp; Logs", detail_resp.text)
         self.assertIn("tab-summary", detail_resp.text)
 
+    def test_artifact_endpoint_integrity_and_legacy_fallback(self):
+        import json
+        from labeeb.core.controller import LabeebController
+
+        create_payload = {
+            "intent": "Test artifact integrity endpoint",
+            "workspace": str(self.root / "workspace"),
+            "repo": "owner/repo",
+            "branch": "main",
+            "risk_tags": [],
+            "allowed_paths": [],
+            "validation_commands": [],
+            "preauthorize_plan": True,
+            "background": False,
+        }
+        resp = self.client.post("/api/goals", json=create_payload)
+        self.assertEqual(resp.status_code, 200)
+        goal_id = resp.json()["goal_id"]
+
+        ctl = LabeebController(self.config, goal_id)
+        state = ctl.store.load()
+
+        # 1. Write a valid indexed artifact with hash
+        ctl.artifact_store.write_artifact(
+            state=state,
+            artifact_type="goal_contract",
+            data={"outcome": "original valid contract"},
+            producer="brain",
+            activity_status="SATISFIED",
+        )
+        ctl.store.save(state)
+
+        # Retrieve valid artifact -> 200 OK
+        resp = self.client.get(f"/api/goals/{goal_id}/artifacts/goal_contract")
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.json()["data"]["outcome"], "original valid contract")
+
+        # 2. Tamper with the artifact file on disk
+        art_ref = state["artifacts"]["goal_contract"]["ref"]
+        art_path = pathlib.Path(art_ref.split("#sha256=")[0].replace("file:", ""))
+        self.assertTrue(art_path.exists())
+        # Overwrite file content behind the back of the store to create hash mismatch
+        art_path.write_text(json.dumps({"outcome": "tampered malicious content"}), encoding="utf-8")
+
+        # Retrieval of tampered artifact MUST return HTTP 409 Conflict
+        tampered_resp = self.client.get(f"/api/goals/{goal_id}/artifacts/goal_contract")
+        self.assertEqual(tampered_resp.status_code, 409)
+        self.assertIn("Artifact integrity verification failed", tampered_resp.json()["detail"])
+
+        # 3. Legacy session fallback: artifact file exists on disk, but has no index entry in state['artifacts']
+        ctl.paths.artifacts.mkdir(parents=True, exist_ok=True)
+        legacy_path = ctl.paths.artifacts / "legacy_plan.v1.json"
+        legacy_path.write_text(json.dumps({"plan": "legacy unindexed artifact"}), encoding="utf-8")
+
+        legacy_resp = self.client.get(f"/api/goals/{goal_id}/artifacts/legacy_plan")
+        self.assertEqual(legacy_resp.status_code, 200)
+        self.assertEqual(legacy_resp.json()["plan"], "legacy unindexed artifact")
+
+        # 4. Non-existent artifact -> 404
+        missing_resp = self.client.get(f"/api/goals/{goal_id}/artifacts/does_not_exist")
+        self.assertEqual(missing_resp.status_code, 404)
+
 
 if __name__ == "__main__":
     unittest.main()

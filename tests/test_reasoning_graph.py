@@ -436,3 +436,84 @@ def test_jules_prompt_synthesis_from_execution_contract_data(temp_dir):
     assert "Acceptance Criteria:" in prompt
     assert state.get("phase") != "BLOCKED"
 
+
+def test_locked_proof_contract_ref_pinning_and_validation(temp_dir):
+    from labeeb.core.validation import validate_evidence
+
+    state = {
+        "artifacts": {
+            "proof_contract": {
+                "ref": f"file:{temp_dir}/proof.json#sha256=1111",
+                "sha256": "1111",
+                "validity": ArtifactValidity.VALID,
+                "data": {"entrypoint": "echo original"},
+            }
+        }
+    }
+
+    # Lock proof path with original proof contract
+    ok, status = update_proof_path_lock(state, {}, is_state_changing=True)
+    assert ok is True
+    assert state["proof_path_locked"] is True
+    assert state["locked_proof_contract_ref"] == f"file:{temp_dir}/proof.json#sha256=1111"
+    assert state["locked_proof_contract_sha256"] == "1111"
+
+    # Divergent proof contract replacement attempt
+    state["artifacts"]["proof_contract"] = {
+        "ref": f"file:{temp_dir}/proof_v2.json#sha256=2222",
+        "sha256": "2222",
+        "validity": ArtifactValidity.VALID,
+        "data": {"entrypoint": "echo replaced"},
+    }
+
+    # Calling update_proof_path_lock without diagnostic flag raises ControllerError
+    with pytest.raises(ControllerError, match="Cannot replace locked original proof path"):
+        update_proof_path_lock(state, state["artifacts"]["proof_contract"]["data"], is_diagnostic_only=False)
+
+    raw_cfg = {
+        "controller": {"state_root": str(temp_dir / "state")},
+        "executables": {"orchestrator": "true", "cjules": "true"},
+        "roles": {
+            "brain": {"transport": "orchestrator", "runtime": "mock"},
+            "implementer": {"transport": "jules", "command": "cjules"},
+        },
+    }
+    config = Config(temp_dir / "config.toml", raw_cfg)
+    ctl = LabeebController.create_goal(
+        config,
+        intent="Test locked proof contract",
+        workspace=str(temp_dir),
+        repo="owner/repo",
+        branch="main",
+        risk_tags=[],
+        allowed_paths=[],
+        validation_commands=[],
+        preauthorize_plan=True,
+    )
+    patch_path = temp_dir / "patch.diff"
+    patch_path.write_text("--- a/f\n+++ b/f\n")
+    patch_ref = f"file:{patch_path}#sha256=3333"
+
+    ctl.git.create_worktree = lambda ws, wt, commit: wt.mkdir(parents=True, exist_ok=True)
+    ctl.git.check_patch = lambda *args: None
+    ctl.git.apply_patch = lambda *args: None
+
+    state["contract_ref"] = ctl.store.write_json(
+        ctl.paths.contract,
+        {
+            "workspace": str(temp_dir),
+            "validation_commands": ["true"],
+        },
+    )
+
+    ev_in = {
+        "patch_ref": patch_ref,
+        "base_commit": "abcdef123456",
+    }
+
+    # In validate_evidence, divergence from locked_proof_contract_ref is detected
+    evidence = validate_evidence(state, ev_in, ctl.config, ctl.paths, ctl.git)
+    assert evidence["goal_proof"]["proof_passed"] is False
+    assert "diverges from locked original proof ref" in evidence["goal_proof"]["reason"]
+
+

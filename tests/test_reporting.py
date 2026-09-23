@@ -419,3 +419,178 @@ def test_final_report_populates_from_v2_goal_contract_and_evidence(controller):
     assert "Ensure Windows console supports ANSI escapes" in md_text
     assert "Baseline: FAIL (exit code 2) -> Final: PASS (exit code 0)" in md_text
 
+
+def test_durable_pending_terminal_recovery_on_report_failure(tmp_path, monkeypatch):
+    """Verify that report generation failure durably preserves pending_terminal and resumes to PASS."""
+    raw_cfg = {
+        "controller": {"state_root": str(tmp_path / "state")},
+        "executables": {"orchestrator": "true", "cjules": "true"},
+        "roles": {
+            "brain": {"transport": "orchestrator", "runtime": "mock"},
+            "implementer": {"transport": "jules", "command": "cjules"},
+        },
+    }
+    config = Config(tmp_path / "config.toml", raw_cfg)
+    controller = LabeebController.create_goal(
+        config,
+        intent="Test durable report recovery",
+        workspace=str(tmp_path),
+        repo="owner/repo",
+        branch="main",
+        risk_tags=[],
+        allowed_paths=[],
+        validation_commands=[],
+        preauthorize_plan=True,
+    )
+    state = controller.store.load()
+    state["phase"] = "REVIEWING"
+
+    decision = {"action": "PASS", "reason": "All checks passed"}
+    evidence = {"validation": {"status": "PASS", "exit_code": 0}}
+
+    # Simulate report generation failure
+    def fail_generate(*args, **kwargs):
+        raise IOError("Disk full during report generation")
+
+    monkeypatch.setattr(controller.report_generator, "generate_and_save", fail_generate)
+
+    # Calling pass_goal raises ControllerError
+    with pytest.raises(ControllerError, match="Durable report generation failed"):
+        controller.pass_goal(state, decision, evidence)
+
+    # Verify pending_terminal was durably persisted in state.json
+    persisted = controller.store.load()
+    assert persisted.get("pending_terminal") is not None
+    assert persisted["pending_terminal"]["status"] == "PASS"
+    assert persisted["pending_terminal"]["reason"] == "All checks passed"
+    assert persisted["phase"] == "REVIEWING"
+
+    # Restore normal report generator and resume controller step
+    monkeypatch.undo()
+    resumed = controller.step(persisted)
+    assert resumed is True
+
+    # Goal is now cleanly PASS, with result.json and cleared pending_terminal
+    final_state = controller.store.load()
+    assert final_state["phase"] == "PASS"
+    assert final_state.get("pending_terminal") is None
+    assert controller.paths.results.exists()
+    result_data = read_ref_json(final_state["result_ref"])
+    assert result_data["status"] == "PASS"
+    assert result_data["reason"] == "All checks passed"
+
+
+def test_accurate_evidence_reporting_without_inference(tmp_path):
+    """Verify that absent validation and goal proof are reported as UNEXECUTED / Unavailable without inference."""
+    raw_cfg = {
+        "controller": {"state_root": str(tmp_path / "state")},
+        "executables": {"orchestrator": "true", "cjules": "true"},
+        "roles": {
+            "brain": {"transport": "orchestrator", "runtime": "mock"},
+            "implementer": {"transport": "jules", "command": "cjules"},
+        },
+    }
+    config = Config(tmp_path / "config.toml", raw_cfg)
+    controller = LabeebController.create_goal(
+        config,
+        intent="Test unobserved evidence reporting",
+        workspace=str(tmp_path),
+        repo="owner/repo",
+        branch="main",
+        risk_tags=[],
+        allowed_paths=[],
+        validation_commands=[],
+        preauthorize_plan=True,
+    )
+    state = controller.store.load()
+
+    # Record an artifact with activity_status="NOT_APPLICABLE"
+    controller.artifact_store.write_artifact(
+        state,
+        "product_contract",
+        {"status": "NOT_APPLICABLE"},
+        "brain",
+        activity_status="NOT_APPLICABLE",
+        not_applicable_reason="Backend only",
+    )
+
+    # Generate report with NO validation evidence and NO goal proof
+    report_gen = FinalReportGenerator(controller)
+    report_data, _ = report_gen.generate_and_save(state, "PASS", reason="Direct PASS without validation")
+
+    # Assert validation is UNEXECUTED, exit code is None
+    val_sum = report_data["validation_summary"]
+    assert val_sum["status"] == "UNEXECUTED"
+    assert val_sum["exit_code"] is None
+
+    # Assert goal proof is Unavailable and proof_passed is False
+    gp = report_data["phase5_evidence"]["goal_proof"]
+    assert gp["status"] == "Unavailable"
+    assert gp["proof_passed"] is False
+
+    # Assert artifacts provenance accurately preserves activity_status
+    prov = {entry["artifact_type"]: entry for entry in report_data["artifacts_provenance"]}
+    assert "product_contract" in prov
+    assert prov["product_contract"]["status"] == "NOT_APPLICABLE"
+
+    # Assert markdown displays N/A for exit code
+    md_text = controller.paths.final_report_md.read_text(encoding="utf-8")
+    assert "- **Validation Status**: `UNEXECUTED`" in md_text
+    assert "- **Subprocess Exit Code**: `N/A`" in md_text
+    assert "- **Goal Proof Passed**: `Unavailable (Unverified)`" in md_text
+
+
+def test_partial_validation_evidence_reported_as_unknown(controller):
+    """P1 regression: Partial validation evidence without explicit status or exit code 0
+
+    must be reported as UNKNOWN, not PASS, even if the terminal status is PASS.
+    """
+    state = controller.store.load()
+
+    # Partial validation evidence with commands but no status or exit_code
+    partial_val = {
+        "commands": ["pytest tests/test_smoke.py"],
+        "stdout": "running tests...",
+    }
+
+    report_gen = FinalReportGenerator(controller)
+    report_data, _ = report_gen.generate_and_save(
+        state,
+        "PASS",
+        reason="Terminal status PASS with partial validation",
+        evidence={"validation": partial_val},
+    )
+
+    val_sum = report_data["validation_summary"]
+    assert val_sum["status"] == "UNKNOWN", "Partial validation without status or exit_code 0 must report UNKNOWN"
+    assert val_sum["exit_code"] is None
+    assert report_data["proof_passed"] is False
+
+    md_text = controller.paths.final_report_md.read_text(encoding="utf-8")
+    assert "- **Validation Status**: `UNKNOWN`" in md_text
+    assert "- **Goal Proof Passed**: `Unavailable (Unverified)`" in md_text
+    assert "- **Goal Proof Passed**: `True`" not in md_text
+
+
+def test_pass_without_goal_proof_renders_unverified_markdown(controller):
+    """P1 regression: A PASS goal without recorded goal proof must render
+
+    'Goal Proof Passed: Unavailable (Unverified)', not 'Goal Proof Passed: True'.
+    """
+    state = controller.store.load()
+
+    report_gen = FinalReportGenerator(controller)
+    report_data, _ = report_gen.generate_and_save(
+        state,
+        "PASS",
+        reason="Claimed success without empirical proof artifact",
+    )
+
+    assert report_data["proof_passed"] is False
+    md_text = controller.paths.final_report_md.read_text(encoding="utf-8")
+    assert "- **Goal Proof Passed**: `Unavailable (Unverified)`" in md_text
+    assert "- **Goal Proof Passed**: `True`" not in md_text
+
+
+
+

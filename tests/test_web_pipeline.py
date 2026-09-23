@@ -184,3 +184,72 @@ class WebPipelineTests(unittest.TestCase):
         self.assertEqual(resp_ui.status_code, 200)
         self.assertIn("final-report-raw-text", resp_ui.text)
         self.assertIn("Goal Report", resp_ui.text)
+
+    def test_live_update_assets_and_sse_subscriptions(self):
+        # 1. Verify app.js contains reasoning event listeners and debouncing
+        app_js_resp = self.client.get("/static/app.js")
+        self.assertEqual(app_js_resp.status_code, 200)
+        app_js = app_js_resp.text
+        self.assertIn("debounceTimer", app_js)
+        self.assertIn("reasoning.step", app_js)
+        self.assertIn("reasoning.activity_completed", app_js)
+        self.assertIn("reasoning.activity_started", app_js)
+        self.assertIn("readiness.evaluated", app_js)
+        self.assertIn("readiness.human_gate", app_js)
+        self.assertIn("readiness.awaiting_approval", app_js)
+        self.assertIn("prove.started", app_js)
+        self.assertIn("worker.completed", app_js)
+        self.assertIn("validation.completed", app_js)
+        self.assertIn("validation.failed", app_js)
+
+        # 2. Verify goal_live_poll.js manages lifecycle and unblock resume
+        poll_js_resp = self.client.get("/static/goal_live_poll.js")
+        self.assertEqual(poll_js_resp.status_code, 200)
+        poll_js = poll_js_resp.text
+        self.assertIn("checkAndStartPolling", poll_js)
+        self.assertIn("goalUpdated", poll_js)
+        self.assertIn("htmx:afterSettle", poll_js)
+
+        # 3. Verify goal detail page links goal_live_poll.js
+        detail_resp = self.client.get(f"/goals/{self.goal_id}")
+        self.assertEqual(detail_resp.status_code, 200)
+        self.assertIn('/static/goal_live_poll.js', detail_resp.text)
+
+    def test_controller_emits_worker_and_validation_domain_events(self):
+        """P2 regression: Controller must emit real domain events for worker.completed
+
+        and validation.completed / validation.failed so SSE subscribers receive them.
+        """
+        from labeeb.core.events import read_domain_events
+
+        state = self.ctl.store.load()
+        state["execution_rounds"] = 1
+
+        # 1. Simulate worker completion domain event
+        self.ctl.record_event("worker.completed", {
+            "session_id": "jules-test-123",
+            "round": 1,
+            "patch_hash": "abc12345",
+        })
+
+        # 2. Simulate validation completion and failure domain events
+        self.ctl.record_event("validation.completed", {
+            "status": "PASS",
+            "exit_code": 0,
+            "duration_seconds": 1.5,
+            "round": 1,
+        })
+        self.ctl.record_event("validation.failed", {
+            "status": "FAIL",
+            "exit_code": 1,
+            "error": "AssertionError",
+            "round": 1,
+        })
+
+        events, _ = read_domain_events(self.ctl.paths.events, after_line=0)
+        ev_types = [e["event_type"] for e in events]
+        self.assertIn("worker.completed", ev_types)
+        self.assertIn("validation.completed", ev_types)
+        self.assertIn("validation.failed", ev_types)
+
+
