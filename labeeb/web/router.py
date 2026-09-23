@@ -711,6 +711,40 @@ def build_enriched_events(
             "raw_json": json.dumps(goal_status, indent=2, ensure_ascii=False),
         })
 
+    # Include custom or domain-specific events from timeline_events that are not synthetic milestones
+    handled_types = {
+        "goal.created",
+        "plan.ready",
+        "jules.dispatched",
+        "worker.completed",
+        "validation.completed",
+        "goal.passed",
+        "goal.failed",
+        "goal.blocked",
+    }
+    for ev in timeline_events:
+        ev_type = ev.get("event_type", "")
+        if ev_type and ev_type not in handled_types:
+            ts = ev.get("timestamp", utc_now())
+            events.append({
+                "id": f"ev-{ev.get('event_id') or ev_type}-{len(events)}",
+                "type": ev_type,
+                "title": f"Event: {ev_type}",
+                "phase": ev.get("data", {}).get("phase", goal_status.get("phase", "")),
+                "badge": "EVENT",
+                "badge_class": "badge-active",
+                "icon": "event_note",
+                "icon_color": "#94a3b8",
+                "icon_class": "tab-icon-timeline",
+                "timestamp": ts,
+                "time_str": str(ts)[11:19] if len(str(ts)) >= 19 else "00:00:00",
+                "elapsed_str": calc_elapsed(ts),
+                "summary": json.dumps(ev.get("data", {}), ensure_ascii=False)[:80],
+                "details": ev.get("data", {}),
+                "raw_json": json.dumps(ev, indent=2, ensure_ascii=False),
+            })
+
+    events.sort(key=lambda x: str(x.get("timestamp") or ""))
     return events
 
 

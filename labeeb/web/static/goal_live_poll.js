@@ -41,23 +41,41 @@
       if (TERMINAL_PHASES.has(data.phase)) {
         // One final update after terminal state
         document.body.dispatchEvent(new CustomEvent("goalUpdated"));
-        clearInterval(timerId);
-        timerId = null;
+        if (timerId) {
+          clearInterval(timerId);
+          timerId = null;
+        }
       }
     } catch (_) {
       // Network hiccup — silently skip this cycle
     }
   }
 
-  // Initial snapshot from current page state (avoid first-cycle false trigger)
-  const phaseEl = document.getElementById("goal-phase-text");
-  if (phaseEl) {
-    const currentPhase = phaseEl.textContent.trim();
-    if (TERMINAL_PHASES.has(currentPhase)) return; // Already terminal, no polling needed
+  function checkAndStartPolling() {
+    const phaseEl = document.getElementById("goal-phase-text");
+    const currentPhase = phaseEl ? phaseEl.textContent.trim() : "";
+    if (currentPhase && !TERMINAL_PHASES.has(currentPhase)) {
+      if (!timerId) {
+        timerId = setInterval(poll, POLL_INTERVAL_MS);
+      }
+    } else if (TERMINAL_PHASES.has(currentPhase)) {
+      if (timerId) {
+        clearInterval(timerId);
+        timerId = null;
+      }
+    }
   }
 
-  // Start polling
-  timerId = setInterval(poll, POLL_INTERVAL_MS);
+  // Initial check
+  checkAndStartPolling();
+
+  // Resume / check polling when DOM updates after unblock or HTMX swap
+  document.body.addEventListener("goalUpdated", function () {
+    setTimeout(checkAndStartPolling, 100);
+  });
+  document.body.addEventListener("htmx:afterSettle", function () {
+    checkAndStartPolling();
+  });
 
   // Clean up on navigation
   window.addEventListener("beforeunload", function () {

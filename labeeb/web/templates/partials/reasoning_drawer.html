@@ -34,12 +34,13 @@
           <span>1. Contracts</span>
         </div>
         <div class="activity-chips-list">
-          {% for act_id, act_name in [('authority_context', 'Authority Context'), ('goal_contract', 'Goal Contract'), ('product_validation', 'Product Validation'), ('proof_contract', 'Proof Contract')] %}
-            {% set art = (goal.artifacts or {}).get(act_id) %}
+          {% for act_id, act_name, art_key in [('authority_context', 'Authority Context', 'authority_context'), ('goal_contract', 'Goal Contract', 'goal_contract'), ('product_validation', 'Product Validation', 'product_contract'), ('proof_contract', 'Proof Contract', 'proof_contract')] %}
+            {% set art = (goal.artifacts or {}).get(art_key) or (goal.artifacts or {}).get(act_id) %}
             {% set is_active = (goal.current_activity == act_id and goal.phase not in ['PASS', 'FAIL', 'BLOCKED']) %}
             {% set is_stale = (art and art.validity == 'STALE') %}
-            {% set is_na = (art and art.status == 'NOT_APPLICABLE') %}
-            {% set is_satisfied = (art and art.validity == 'VALID' and not is_na) %}
+            {% set act_st = (art.activity_status or art.status) if art else '' %}
+            {% set is_na = (act_st == 'NOT_APPLICABLE') %}
+            {% set is_satisfied = (art and art.validity == 'VALID' and act_st == 'SATISFIED') %}
             <div class="activity-chip {% if is_active %}active{% elif is_stale %}stale{% elif is_satisfied %}satisfied{% elif is_na %}na{% else %}pending{% endif %}">
               <span class="chip-status-icon">
                 {% if is_active %}●{% elif is_stale %}⚠️{% elif is_satisfied %}✓{% elif is_na %}—{% else %}○{% endif %}
@@ -61,8 +62,9 @@
             {% set art = (goal.artifacts or {}).get(art_key) or (goal.artifacts or {}).get(act_id) %}
             {% set is_active = (goal.current_activity == act_id and goal.phase not in ['PASS', 'FAIL', 'BLOCKED']) %}
             {% set is_stale = (art and art.validity == 'STALE') %}
-            {% set is_na = (art and art.status == 'NOT_APPLICABLE') %}
-            {% set is_satisfied = (art and art.validity == 'VALID' and not is_na) %}
+            {% set act_st = (art.activity_status or art.status) if art else '' %}
+            {% set is_na = (act_st == 'NOT_APPLICABLE') %}
+            {% set is_satisfied = (art and art.validity == 'VALID' and act_st == 'SATISFIED') %}
             <div class="activity-chip {% if is_active %}active{% elif is_stale %}stale{% elif is_satisfied %}satisfied{% elif is_na %}na{% else %}pending{% endif %}">
               <span class="chip-status-icon">
                 {% if is_active %}●{% elif is_stale %}⚠️{% elif is_satisfied %}✓{% elif is_na %}—{% else %}○{% endif %}
@@ -84,8 +86,9 @@
             {% set art = (goal.artifacts or {}).get(art_key) or (goal.artifacts or {}).get(act_id) %}
             {% set is_active = (goal.current_activity == act_id and goal.phase not in ['PASS', 'FAIL', 'BLOCKED']) %}
             {% set is_stale = (art and art.validity == 'STALE') %}
-            {% set is_na = (art and art.status == 'NOT_APPLICABLE') %}
-            {% set is_satisfied = (art and art.validity == 'VALID' and not is_na) %}
+            {% set act_st = (art.activity_status or art.status) if art else '' %}
+            {% set is_na = (act_st == 'NOT_APPLICABLE') %}
+            {% set is_satisfied = (art and art.validity == 'VALID' and act_st == 'SATISFIED') %}
             <div class="activity-chip {% if is_active %}active{% elif is_stale %}stale{% elif is_satisfied %}satisfied{% elif is_na %}na{% else %}pending{% endif %}">
               <span class="chip-status-icon">
                 {% if is_active %}●{% elif is_stale %}⚠️{% elif is_satisfied %}✓{% elif is_na %}—{% else %}○{% endif %}
@@ -107,8 +110,9 @@
             {% set art = (goal.artifacts or {}).get(art_key) or (goal.artifacts or {}).get(act_id) %}
             {% set is_active = (goal.current_activity == act_id and goal.phase not in ['PASS', 'FAIL', 'BLOCKED']) %}
             {% set is_stale = (art and art.validity == 'STALE') %}
-            {% set is_na = (art and art.status == 'NOT_APPLICABLE') %}
-            {% set is_satisfied = (art and art.validity == 'VALID' and not is_na) %}
+            {% set act_st = (art.activity_status or art.status) if art else '' %}
+            {% set is_na = (act_st == 'NOT_APPLICABLE') %}
+            {% set is_satisfied = (art and art.validity == 'VALID' and act_st == 'SATISFIED') %}
             <div class="activity-chip {% if is_active %}active{% elif is_stale %}stale{% elif is_satisfied %}satisfied{% elif is_na %}na{% else %}pending{% endif %}">
               <span class="chip-status-icon">
                 {% if is_active %}●{% elif is_stale %}⚠️{% elif is_satisfied %}✓{% elif is_na %}—{% else %}○{% endif %}
@@ -130,8 +134,9 @@
             {% set art = (goal.artifacts or {}).get(act_id) %}
             {% set is_active = (goal.current_activity == act_id and goal.phase not in ['PASS', 'FAIL', 'BLOCKED']) %}
             {% set is_stale = (art and art.validity == 'STALE') %}
-            {% set is_na = (art and art.status == 'NOT_APPLICABLE') %}
-            {% set is_satisfied = (art and art.validity == 'VALID' and not is_na) %}
+            {% set act_st = (art.activity_status or art.status) if art else '' %}
+            {% set is_na = (act_st == 'NOT_APPLICABLE') %}
+            {% set is_satisfied = (art and art.validity == 'VALID' and act_st == 'SATISFIED') %}
             <div class="activity-chip {% if is_active %}active{% elif is_stale %}stale{% elif is_satisfied %}satisfied{% elif is_na %}na{% else %}pending{% endif %}">
               <span class="chip-status-icon">
                 {% if is_active %}●{% elif is_stale %}⚠️{% elif is_satisfied %}✓{% elif is_na %}—{% else %}○{% endif %}

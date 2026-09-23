@@ -140,23 +140,27 @@ function connectGoalSSE(goalId) {
     // heartbeats or default messages
   };
 
+  let debounceTimer = null;
   const reloadFragments = () => {
-    if (window.htmx) {
-      htmx.trigger('body', 'goalUpdated');
-    } else {
-      // Light fallback refresh if HTMX is absent
-      const badge = document.getElementById('stage-badge-container');
-      if (badge) {
-        fetch(`/api/goals/${goalId}`)
-          .then(r => r.json())
-          .then(data => {
-            if (data.phase) {
-              const statusEl = document.getElementById('goal-phase-text');
-              if (statusEl) statusEl.innerText = data.phase;
-            }
-          });
+    if (debounceTimer) clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(() => {
+      if (window.htmx) {
+        htmx.trigger('body', 'goalUpdated');
+      } else {
+        // Light fallback refresh if HTMX is absent
+        const badge = document.getElementById('stage-badge-container');
+        if (badge) {
+          fetch(`/api/goals/${goalId}`)
+            .then(r => r.json())
+            .then(data => {
+              if (data.phase) {
+                const statusEl = document.getElementById('goal-phase-text');
+                if (statusEl) statusEl.innerText = data.phase;
+              }
+            });
+        }
       }
-    }
+    }, 250);
   };
 
   evtSource.addEventListener('goal.synced', (e) => {
@@ -187,6 +191,50 @@ function connectGoalSSE(goalId) {
   });
 
   evtSource.addEventListener('repair.dispatched', (e) => {
+    reloadFragments();
+  });
+
+  evtSource.addEventListener('reasoning.step', (e) => {
+    reloadFragments();
+  });
+
+  evtSource.addEventListener('reasoning.activity_completed', (e) => {
+    reloadFragments();
+  });
+
+  evtSource.addEventListener('reasoning.activity_started', (e) => {
+    reloadFragments();
+  });
+
+  evtSource.addEventListener('readiness.evaluated', (e) => {
+    reloadFragments();
+  });
+
+  evtSource.addEventListener('readiness.blocked', (e) => {
+    reloadFragments();
+  });
+
+  evtSource.addEventListener('readiness.human_gate', (e) => {
+    reloadFragments();
+  });
+
+  evtSource.addEventListener('readiness.awaiting_approval', (e) => {
+    reloadFragments();
+  });
+
+  evtSource.addEventListener('prove.started', (e) => {
+    reloadFragments();
+  });
+
+  evtSource.addEventListener('worker.completed', (e) => {
+    reloadFragments();
+  });
+
+  evtSource.addEventListener('validation.completed', (e) => {
+    reloadFragments();
+  });
+
+  evtSource.addEventListener('validation.failed', (e) => {
     reloadFragments();
   });
 
