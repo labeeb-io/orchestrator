@@ -26,6 +26,34 @@
     </button>
   </div>
 </div>
+{% elif goal and goal.phase == 'AWAITING_IMPLEMENTATION_REVIEW' %}
+<div class="decision-banner" id="decision-banner" style="border-color: rgba(245, 158, 11, 0.3); background-color: var(--color-obsidian);">
+  <div class="decision-info">
+    <h3 style="display: flex; align-items: center; gap: 8px;">
+      <span class="material-symbols-outlined" style="font-size: 20px; color: #f59e0b;">verified</span>
+      <span style="color: var(--color-paper);">Human Review Required: Implementation Materialized</span>
+    </h3>
+    <p style="color: var(--color-mist); margin-top: 4px;">Jules has materialized working-tree changes. Human review is required before advancing to deterministic validation.</p>
+  </div>
+  <div style="display: flex; gap: 10px; align-items: center;">
+    <button type="button" class="btn btn-primary"
+            hx-post="/api/goals/{{ goal.goal_id }}/approve"
+            hx-swap="none"
+            onclick="this.innerText='Validating...'; this.disabled=true;"
+            style="display: inline-flex; align-items: center; gap: 6px;">
+      <span class="material-symbols-outlined" style="font-size: 16px;">check_circle</span>
+      <span>Approve &amp; Run Validation</span>
+    </button>
+    <button type="button" class="btn btn-danger"
+            hx-post="/api/goals/{{ goal.goal_id }}/stop"
+            hx-swap="none"
+            onclick="this.innerText='Stopping...'; this.disabled=true;"
+            style="display: inline-flex; align-items: center; gap: 6px;">
+      <span class="material-symbols-outlined" style="font-size: 16px;">stop_circle</span>
+      <span>Stop Goal</span>
+    </button>
+  </div>
+</div>
 {% elif goal and goal.phase == 'BLOCKED' %}
 <div class="decision-banner" style="border-color: rgba(235, 87, 87, 0.3); background-color: var(--color-obsidian);">
   <div class="decision-info" style="flex: 1;">

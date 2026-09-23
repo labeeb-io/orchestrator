@@ -16,6 +16,18 @@
           <span>Baseline Shortcut (Zero Mutations)</span>
         </span>
       {% endif %}
+      {% if goal.materialization_verified %}
+        <span class="badge badge-active" style="font-size: 11px; display: inline-flex; align-items: center; gap: 4px; background: rgba(16, 185, 129, 0.1); color: #10b981; border-color: rgba(16, 185, 129, 0.3);">
+          <span class="material-symbols-outlined" style="font-size: 13px;">verified</span>
+          <span>Workspace Materialized</span>
+        </span>
+      {% endif %}
+      {% if goal.materialization_corrections and goal.materialization_corrections > 0 %}
+        <span class="badge badge-warn" style="font-size: 11px; display: inline-flex; align-items: center; gap: 4px; background: rgba(245, 158, 11, 0.1); color: #f59e0b; border-color: rgba(245, 158, 11, 0.3);">
+          <span class="material-symbols-outlined" style="font-size: 13px;">sync_problem</span>
+          <span>Protocol Correction ({{ goal.materialization_corrections }}/1)</span>
+        </span>
+      {% endif %}
     </div>
     <div style="font-size: 11.5px; color: var(--color-fog); font-family: var(--font-mono);">
       Phase: <strong style="color: var(--color-paper);">{{ goal.macro_phase or 'THINKING' }}</strong>

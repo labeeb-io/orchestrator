@@ -22,6 +22,11 @@
         <span class="material-symbols-outlined" style="font-size: 16px;">check</span>
         <span>Approve Plan</span>
       </button>
+    {% elif goal.phase == 'AWAITING_IMPLEMENTATION_REVIEW' %}
+      <button class="btn btn-primary btn-sm" hx-post="/api/goals/{{ goal.goal_id }}/approve" hx-swap="none" style="display: inline-flex; align-items: center; gap: 6px;">
+        <span class="material-symbols-outlined" style="font-size: 16px;">verified</span>
+        <span>Approve Implementation</span>
+      </button>
     {% endif %}
     {% if goal.phase not in ['PASS', 'FAIL', 'BLOCKED'] %}
       <button class="btn btn-danger btn-sm" hx-post="/api/goals/{{ goal.goal_id }}/stop" hx-swap="none" style="display: inline-flex; align-items: center; gap: 6px;">

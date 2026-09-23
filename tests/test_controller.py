@@ -230,14 +230,45 @@ class ControllerTests(unittest.TestCase):
         state["jules_session_id"] = "s1"
         self.ctl.store.save(state)
         session = {"state": "COMPLETED", "updateTime": "2026-01-01T00:00:00Z"}
-        logs = {"activities": [{"id": "a1", "createTime": "2026-01-01T00:00:00Z", "agentMessaged": {"agentMessage": "done"}}]}
+        patch = "diff --git a/src/target.txt b/src/target.txt\n--- a/src/target.txt\n+++ b/src/target.txt\n@@ -0,0 +1 @@\n+hello\n"
+        logs = {
+            "activities": [
+                {
+                    "id": "a1",
+                    "createTime": "2026-01-01T00:00:00Z",
+                    "agentMessaged": {"agentMessage": "done"},
+                    "artifacts": [{"changeSet": {"gitPatch": {"baseCommitId": "b1", "unidiffPatch": patch}}}],
+                }
+            ]
+        }
         with mock.patch.object(self.ctl, "jules_get", return_value=session), mock.patch.object(self.ctl, "jules_logs", return_value=logs):
             progressed = self.ctl.step_waiting_jules(state)
         self.assertTrue(progressed)
         now = self.ctl.store.load()
         self.assertEqual(now["phase"], "VALIDATING")
+        self.assertTrue(now["materialization_verified"])
         self.assertIsNotNone(now["review_ref"])
         self.assertEqual(len(now["handled_event_keys"]), 1)
+
+    def test_completed_event_without_patch_sends_materialization_correction(self):
+        state = self.ctl.store.load()
+        state["phase"] = "WAITING_JULES"
+        state["latest_codex_task_id"] = "brain-task-1"
+        state["jules_session_id"] = "s1"
+        self.ctl.store.save(state)
+        session = {"state": "COMPLETED", "updateTime": "2026-01-01T00:00:00Z"}
+        logs = {"activities": [{"id": "a1", "createTime": "2026-01-01T00:00:00Z", "agentMessaged": {"agentMessage": "done"}}]}
+        with mock.patch.object(self.ctl, "jules_get", return_value=session), mock.patch.object(self.ctl, "jules_logs", return_value=logs):
+            progressed = self.ctl.step_waiting_jules(state)
+        self.assertTrue(progressed)
+        now = self.ctl.store.load()
+        self.assertEqual(now["phase"], "EFFECT")
+        self.assertIsNotNone(now["pending_action"])
+        self.assertEqual(now["pending_action"]["kind"], "jules_message")
+        self.assertEqual(now["materialization_corrections"], 1)
+        self.assertFalse(now["materialization_verified"])
+        self.assertFalse(now["repair_reserved"])
+        self.assertEqual(now["execution_rounds"], 0)
 
     def test_config_rejects_more_than_one_repair(self):
         cfg = pathlib.Path(self.tmp.name) / "bad.toml"

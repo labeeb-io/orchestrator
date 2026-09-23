@@ -564,6 +564,29 @@ def build_enriched_events(
             "raw_json": json.dumps(jules_create_res or (dispatch_ev.get("data") if dispatch_ev else {}), indent=2, ensure_ascii=False),
         })
 
+    # Materialization corrections (if any occurred)
+    corr_evs = [e for e in timeline_events if e.get("event_type") == "implementation.materialization_correction"]
+    for i, cev in enumerate(corr_evs):
+        ts_corr = cev.get("timestamp") or ts_created
+        data = cev.get("data") or {}
+        events.append({
+            "id": f"ev-correction-{i+1}",
+            "type": "implementation.materialization_correction",
+            "title": f"Protocol Correction: Materialization Required (#{data.get('correction_count', i+1)})",
+            "phase": "EXECUTE",
+            "badge": "CORRECTION",
+            "badge_class": "badge-yellow",
+            "icon": "sync_problem",
+            "icon_color": "#f59e0b",
+            "icon_class": "tab-icon-summary",
+            "timestamp": ts_corr,
+            "time_str": str(ts_corr)[11:19] if len(str(ts_corr)) >= 19 else "00:00:00",
+            "elapsed_str": calc_elapsed(ts_corr),
+            "summary": "Jules returned textual diff/code without workspace modifications; sent materialization contract reminder.",
+            "details": data,
+            "raw_json": json.dumps(data, indent=2, ensure_ascii=False),
+        })
+
     # Milestone 5: Worker Completed & Patch Ready
     patch_text = evidence.get("patch", "")
     if patch_text:
@@ -599,8 +622,31 @@ def build_enriched_events(
                 "patch_hash": evidence.get("patch_hash", ""),
                 "base_commit": evidence.get("base_commit", ""),
                 "patch": patch_text,
+                "materialization_verified": goal_status.get("materialization_verified", True),
             },
             "raw_json": json.dumps({"patch_hash": evidence.get("patch_hash"), "files": files, "additions": additions, "deletions": deletions}, indent=2, ensure_ascii=False),
+        })
+
+    # Awaiting Implementation Review (if paused)
+    rev_ev = next((e for e in timeline_events if e.get("event_type") == "implementation.awaiting_review"), None)
+    if rev_ev or goal_status.get("phase") == "AWAITING_IMPLEMENTATION_REVIEW":
+        ts_rev = (rev_ev.get("timestamp") if rev_ev else None) or (ts_patch if 'ts_patch' in locals() else ts_created)
+        events.append({
+            "id": "ev-awaiting-impl-review",
+            "type": "implementation.awaiting_review",
+            "title": "Awaiting Implementation Review",
+            "phase": "PAUSED",
+            "badge": "AWAITING REVIEW",
+            "badge_class": "badge-yellow",
+            "icon": "pause_circle",
+            "icon_color": "#eab308",
+            "icon_class": "tab-icon-timeline",
+            "timestamp": ts_rev,
+            "time_str": str(ts_rev)[11:19] if len(str(ts_rev)) >= 19 else "00:00:00",
+            "elapsed_str": calc_elapsed(ts_rev),
+            "summary": "Repository workspace modified; paused for human review before deterministic validation.",
+            "details": rev_ev.get("data", {}) if rev_ev else {},
+            "raw_json": json.dumps(rev_ev.get("data", {}) if rev_ev else {}, indent=2, ensure_ascii=False),
         })
 
     # Milestone 6: Deterministic Worktree Verification
