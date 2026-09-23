@@ -31,3 +31,19 @@ class CommandError(ControllerError):
         self.rc = rc
         self.stdout = stdout
         self.stderr = stderr
+
+
+class JulesSourceUnauthorizedError(ControllerError):
+    """Raised when a repository is not authorized in Google Jules."""
+
+    def __init__(self, repo: str, sources: list[str]):
+        self.repo = repo
+        self.sources = list(sources)
+        sources_str = ", ".join(sources) if sources else "None discovered"
+        msg = (
+            f"Repository '{repo}' is not authorized in Google Jules. "
+            f"Jules cannot mutate this repository without access. "
+            f"Please authorize it at https://jules.google.com/ or select an authorized repository ({sources_str}). "
+            f"Pass --force to bypass this check."
+        )
+        super().__init__(msg)

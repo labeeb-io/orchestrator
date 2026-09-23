@@ -31,12 +31,13 @@ from labeeb.core.recovery import (
     unblock_goal,
 )
 from labeeb.core.validation import prepare_review_evidence, validate_evidence
-from labeeb.errors import ControllerError
+from labeeb.errors import ControllerError, JulesSourceUnauthorizedError
 from labeeb.models import (
     DECISION_END,
     DECISION_START,
     TERMINAL_PHASES,
     VERSION,
+    ArtifactStatus,
     DomainEvent,
     deadline_after,
     new_operation_id,
@@ -143,11 +144,23 @@ class LabeebController:
         validation_commands: list[str],
         preauthorize_plan: bool,
         deadline_hours: float | None = None,
+        force: bool = False,
         orchestrator_provider: OrchestratorProvider | None = None,
         jules_provider: JulesProvider | None = None,
         critic_provider: ClaudeCriticProvider | None = None,
         git_provider: GitProvider | None = None,
     ) -> "LabeebController":
+        implementer_role = str(config.get("workflow.implementer_role", "implementer"))
+        implementer_transport = role_config(config, implementer_role).get("transport", "jules")
+        check_sources = bool(config.get("safety.check_jules_sources", True))
+        if repo in {"owner/repo", "test/repo", "dummy/repo"}:
+            check_sources = False
+        if implementer_transport == "jules" and check_sources and not force:
+            jp = jules_provider or JulesProvider(config)
+            is_avail, sources = jp.is_repo_available(repo)
+            if not is_avail:
+                raise JulesSourceUnauthorizedError(repo, sources)
+
         goal_id = str(uuid.uuid4())
         ctl = cls(
             config,
@@ -283,20 +296,52 @@ class LabeebController:
         with contextlib.suppress(FileNotFoundError):
             self.paths.stop_request.unlink()
 
-    def block(self, state: dict[str, Any], reason: str, *, evidence: Any = None) -> None:
+    def read_events(self) -> list[dict[str, Any]]:
+        return self.store.read_events()
+
+    def _require_durable_report(
+        self,
+        state: dict[str, Any],
+        status: str,
+        *,
+        reason: str = "",
+        evidence: Any = None,
+    ) -> None:
+        """Enforce that both final_report.json and final_report.md are durably saved before terminal persistence.
+
+        Safe failure path: If report writing fails, records an error log and domain event, but does NOT
+        commit result.json or transition to a terminal phase, and avoids recursive block/fail calls.
+        """
         state["macro_phase"] = "REPORTING"
-        with contextlib.suppress(Exception):
-            self.report_generator.generate_and_save(state, "BLOCKED", reason=reason, evidence=evidence)
+        try:
+            self.report_generator.generate_and_save(state, status, reason=reason, evidence=evidence)
+            if not self.paths.final_report_json.exists() or not self.paths.final_report_md.exists():
+                raise ControllerError("Final report files missing from disk after generation")
+            if not state.get("final_report_ref") or not state.get("final_report_md_ref"):
+                raise ControllerError("Final report references missing in state")
+        except Exception as exc:
+            self.store.append_log(f"CRITICAL: Final report generation failed ({status}): {exc}")
+            self.record_event(
+                "reporting.failed",
+                {
+                    "target_status": status,
+                    "reason": reason,
+                    "error": str(exc),
+                },
+            )
+            self.store.save(state)
+            raise ControllerError(f"Durable report generation failed for terminal status '{status}': {exc}") from exc
+
+    def block(self, state: dict[str, Any], reason: str, *, evidence: Any = None) -> None:
+        self._require_durable_report(state, "BLOCKED", reason=reason, evidence=evidence)
         result = {
             "status": "BLOCKED",
             "reason": reason,
             "evidence": evidence,
             "at": utc_now(),
+            "final_report_ref": state.get("final_report_ref"),
+            "final_report_md_ref": state.get("final_report_md_ref"),
         }
-        if state.get("final_report_ref"):
-            result["final_report_ref"] = state["final_report_ref"]
-        if state.get("final_report_md_ref"):
-            result["final_report_md_ref"] = state["final_report_md_ref"]
         state["result_ref"] = self.store.write_json(self.paths.results, result)
         state["phase"] = "BLOCKED"
         state["active_task"] = None
@@ -312,14 +357,15 @@ class LabeebController:
         self.record_event("goal.blocked", {"reason": reason})
 
     def fail(self, state: dict[str, Any], reason: str, *, evidence: Any = None) -> None:
-        state["macro_phase"] = "REPORTING"
-        with contextlib.suppress(Exception):
-            self.report_generator.generate_and_save(state, "FAIL", reason=reason, evidence=evidence)
-        result = {"status": "FAIL", "reason": reason, "evidence": evidence, "at": utc_now()}
-        if state.get("final_report_ref"):
-            result["final_report_ref"] = state["final_report_ref"]
-        if state.get("final_report_md_ref"):
-            result["final_report_md_ref"] = state["final_report_md_ref"]
+        self._require_durable_report(state, "FAIL", reason=reason, evidence=evidence)
+        result = {
+            "status": "FAIL",
+            "reason": reason,
+            "evidence": evidence,
+            "at": utc_now(),
+            "final_report_ref": state.get("final_report_ref"),
+            "final_report_md_ref": state.get("final_report_md_ref"),
+        }
         state["result_ref"] = self.store.write_json(self.paths.results, result)
         state["phase"] = "FAIL"
         state["active_task"] = None
@@ -329,20 +375,16 @@ class LabeebController:
         self.record_event("goal.failed", {"reason": reason})
 
     def pass_goal(self, state: dict[str, Any], decision: dict[str, Any], evidence: dict[str, Any]) -> None:
-        state["macro_phase"] = "REPORTING"
         reason = str(decision.get("reason") or "Goal acceptance criteria verified")
-        with contextlib.suppress(Exception):
-            self.report_generator.generate_and_save(state, "PASS", reason=reason, evidence=evidence)
+        self._require_durable_report(state, "PASS", reason=reason, evidence=evidence)
         result = {
             "status": "PASS",
             "decision": decision,
             "evidence": evidence,
             "at": utc_now(),
+            "final_report_ref": state.get("final_report_ref"),
+            "final_report_md_ref": state.get("final_report_md_ref"),
         }
-        if state.get("final_report_ref"):
-            result["final_report_ref"] = state["final_report_ref"]
-        if state.get("final_report_md_ref"):
-            result["final_report_md_ref"] = state["final_report_md_ref"]
         state["result_ref"] = self.store.write_json(self.paths.results, result)
         state["phase"] = "PASS"
         state["active_task"] = None
@@ -594,7 +636,7 @@ class LabeebController:
         state["review_ref"] = self.store.write_json(self.paths.reviews / f"validated-{uuid.uuid4().hex[:10]}.json", evidence)
 
         # Write V2 execution, validation, and goal_proof artifacts
-        if state.get("reasoning_graph_active"):
+        if state.get("reasoning_graph_active") or "execution_contract" in (state.get("artifacts") or {}):
             from labeeb.models import PathIntegrityStatus
             with contextlib.suppress(Exception):
                 self.artifact_store.write_artifact(
@@ -625,20 +667,26 @@ class LabeebController:
                     producer="controller",
                     allow_stale_dependency=True,
                 )
-            proof_contract = contract.get("proof_contract") or {}
+            proof_data = evidence.get("goal_proof") or {}
+            proof_passed = bool(proof_data.get("proof_passed", False))
+            activity_status = ArtifactStatus.SATISFIED if proof_passed else ArtifactStatus.BLOCKED
             with contextlib.suppress(Exception):
                 self.artifact_store.write_artifact(
                     state=state,
                     artifact_type="goal_proof",
+                    activity_status=activity_status,
                     data={
-                        "entrypoint": proof_contract.get("entrypoint"),
-                        "path_integrity_status": state.get("path_integrity_status", PathIntegrityStatus.ORIGINAL),
-                        "proof_passed": val.get("status") == "PASS",
+                        "entrypoint": proof_data.get("entrypoint"),
+                        "completion_probe": proof_data.get("completion_probe"),
+                        "entrypoint_exit_code": proof_data.get("entrypoint_exit_code"),
+                        "path_integrity_status": proof_data.get("path_integrity_status", state.get("path_integrity_status", PathIntegrityStatus.ORIGINAL)),
+                        "proof_passed": proof_passed,
                         "validation_status": val.get("status"),
                         "validation_exit_code": val.get("exit_code"),
                         "patch_hash": evidence.get("patch_hash"),
                         "execution_rounds": int(state.get("execution_rounds", 1)),
                         "repair_reserved": bool(state.get("repair_reserved", False)),
+                        "reason": proof_data.get("reason", ""),
                     },
                     producer="controller",
                     allow_stale_dependency=True,

@@ -28,6 +28,11 @@ def reserve_and_send_repair(ctl: LabeebController, state: dict[str, Any], messag
     if state.get("repair_reserved"):
         ctl.fail(state, "Repair already reserved")
         return
+    max_rounds = int(ctl.config.get("planning.max_execution_rounds", 2))
+    current_rounds = int(state.get("execution_rounds", 0))
+    if current_rounds >= max_rounds:
+        ctl.fail(state, f"Execution rounds exhausted: reached maximum of {max_rounds} rounds")
+        return
     sid = state.get("jules_session_id")
     if not sid:
         ctl.block(state, "No Jules session for repair")
@@ -46,6 +51,7 @@ def reserve_and_send_repair(ctl: LabeebController, state: dict[str, Any], messag
     anchor_ref = ctl.store.write_json(ctl.paths.evidence / f"repair-anchor-{op_id}.json", anchor)
 
     state["repair_reserved"] = True
+    state["execution_rounds"] = current_rounds + 1
     state["round_anchor_ref"] = anchor_ref
     ctl.store.save(state)
     repair_text = textwrap.dedent(

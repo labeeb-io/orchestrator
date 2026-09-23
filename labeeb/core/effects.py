@@ -125,7 +125,12 @@ class EffectManager:
                 raise ControllerError(f"Unsupported effect kind: {kind}")
         except CommandError as exc:
             if kind in {"jules_create", "jules_message", "jules_approve", "brain_launch", "brain_resume"}:
-                self.store.append_log(f"effect command failed; reconciling {kind}: {exc}")
+                err_detail = f"{exc}"
+                if getattr(exc, "stderr", None) and str(exc.stderr).strip():
+                    err_detail += f" | stderr: {str(exc.stderr).strip()}"
+                if getattr(exc, "stdout", None) and str(exc.stdout).strip():
+                    err_detail += f" | stdout: {str(exc.stdout).strip()}"
+                self.store.append_log(f"effect command failed; reconciling {kind}: {err_detail}")
                 self.reconcile_effect(state, state["pending_action"], command_error=exc, on_block=on_block)
                 return
             raise
@@ -184,9 +189,43 @@ class EffectManager:
                     state["jules_session_history"].append(sid)
                 self.complete_effect(state, {"adopted": True, "session_id": sid})
                 return
+            if len(matches) > 1:
+                block(
+                    f"Ambiguous Jules create: expected at most one matching session, found {len(matches)}",
+                    evidence={"marker": payload["marker"], "matches": [session_id(x) for x in matches]},
+                )
+                return
+            # len(matches) == 0:
+            is_avail, sources = self.jules.is_repo_available(payload.get("repo", ""))
+            if not is_avail:
+                sources_str = ", ".join(sources) if sources else "None discovered"
+                block(
+                    f"Jules create failed: repository '{payload.get('repo')}' is not authorized in Google Jules",
+                    evidence={
+                        "marker": payload["marker"],
+                        "repo": payload.get("repo"),
+                        "authorized_sources": sources,
+                        "instruction": f"Please authorize '{payload.get('repo')}' at https://jules.google.com/ or select an authorized source ({sources_str}).",
+                    },
+                )
+                return
+            if command_error:
+                err_msg = str(command_error)
+                stderr_str = str(getattr(command_error, "stderr", "") or "").strip()
+                stdout_str = str(getattr(command_error, "stdout", "") or "").strip()
+                block(
+                    f"Jules create failed: {err_msg}",
+                    evidence={
+                        "marker": payload["marker"],
+                        "command_error": err_msg,
+                        "stderr": stderr_str,
+                        "stdout": stdout_str,
+                    },
+                )
+                return
             block(
-                f"Ambiguous Jules create: expected exactly one matching session, found {len(matches)}",
-                evidence={"marker": payload["marker"], "matches": [session_id(x) for x in matches]},
+                "Ambiguous Jules create: expected exactly one matching session, found 0",
+                evidence={"marker": payload["marker"], "matches": []},
             )
             return
         if kind == "jules_message":
@@ -199,6 +238,18 @@ class EffectManager:
                     return
                 if i + 1 < attempts:
                     time.sleep(delay)
+            if command_error:
+                err_msg = str(command_error)
+                block(
+                    f"Jules message failed: {err_msg}",
+                    evidence={
+                        "marker": payload["marker"],
+                        "command_error": err_msg,
+                        "stderr": str(getattr(command_error, "stderr", "") or "").strip(),
+                        "stdout": str(getattr(command_error, "stdout", "") or "").strip(),
+                    },
+                )
+                return
             block("Ambiguous Jules message delivery; refusing duplicate send", evidence={"marker": payload["marker"]})
             return
         if kind == "jules_approve":
@@ -218,6 +269,18 @@ class EffectManager:
                     return
                 if i + 1 < attempts:
                     time.sleep(delay)
+            if command_error:
+                err_msg = str(command_error)
+                block(
+                    f"Jules approve failed: {err_msg}",
+                    evidence={
+                        "session_id": payload["session_id"],
+                        "command_error": err_msg,
+                        "stderr": str(getattr(command_error, "stderr", "") or "").strip(),
+                        "stdout": str(getattr(command_error, "stdout", "") or "").strip(),
+                    },
+                )
+                return
             block("Ambiguous Jules plan approval; refusing duplicate approval without proven planApproved activity")
             return
         block(f"Cannot reconcile effect kind: {kind}")

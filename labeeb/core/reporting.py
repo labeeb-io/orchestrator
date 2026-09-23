@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import contextlib
 import dataclasses
-import pathlib
 from typing import TYPE_CHECKING, Any
 
 from labeeb.core.artifacts import FINAL_REPORT
@@ -47,6 +46,7 @@ class FinalReport:
     patch_summary: dict[str, Any]
     artifacts_provenance: list[dict[str, Any]]
     reasoning_trajectory: list[dict[str, Any]]
+    phase5_evidence: dict[str, Any] = dataclasses.field(default_factory=dict)
     markdown_content: str = ""
 
     def to_dict(self) -> dict[str, Any]:
@@ -71,6 +71,7 @@ class FinalReport:
             "patch_summary": self.patch_summary,
             "artifacts_provenance": self.artifacts_provenance,
             "reasoning_trajectory": self.reasoning_trajectory,
+            "phase5_evidence": self.phase5_evidence,
         }
 
 
@@ -138,7 +139,7 @@ class FinalReportGenerator:
         # Calculate duration
         duration_seconds = 0.0
         try:
-            from datetime import datetime, timezone
+            from datetime import datetime
             t0 = datetime.fromisoformat(created_at.replace("Z", "+00:00"))
             t1 = datetime.fromisoformat(completed_at.replace("Z", "+00:00"))
             duration_seconds = max(0.0, round((t1 - t0).total_seconds(), 2))
@@ -172,13 +173,56 @@ class FinalReportGenerator:
         else:
             terminal_path = "STANDARD_EXECUTION"
 
+        def _get_artifact_data(art_type: str) -> dict[str, Any] | None:
+            entry = (state.get("artifacts") or {}).get(art_type)
+            if isinstance(entry, dict) and entry.get("ref"):
+                with contextlib.suppress(Exception):
+                    d = read_ref_json(entry["ref"]).get("data")
+                    if isinstance(d, dict):
+                        return d
+            return None
+
+        # 1. Resolve Contract Fields (nested goal_contract or artifact takes precedence over top-level fallback)
+        gc = contract.get("goal_contract") if isinstance(contract.get("goal_contract"), dict) else {}
+        gc_art_data: dict[str, Any] = _get_artifact_data("goal_contract") or {}
+
         intent = str(contract.get("intent") or state.get("intent") or "Unspecified engineering goal")
-        observable_outcome = str(contract.get("observable_outcome") or "Observable outcome not specified")
-        expected_behavior = str(contract.get("expected_behavior") or "Expected behavior not specified")
-        current_behavior = str(contract.get("current_behavior") or "Baseline defect not specified")
-        acceptance_criteria = list(contract.get("acceptance_criteria") or [])
-        constraints = list(contract.get("constraints") or [])
-        non_goals = list(contract.get("non_goals") or [])
+        observable_outcome = str(
+            gc.get("observable_outcome")
+            or gc_art_data.get("observable_outcome")
+            or contract.get("observable_outcome")
+            or "Observable outcome not specified"
+        )
+        expected_behavior = str(
+            gc.get("expected_behavior")
+            or gc_art_data.get("expected_behavior")
+            or contract.get("expected_behavior")
+            or "Expected behavior not specified"
+        )
+        current_behavior = str(
+            gc.get("current_behavior")
+            or gc_art_data.get("current_behavior")
+            or contract.get("current_behavior")
+            or "Baseline defect not specified"
+        )
+        acceptance_criteria = list(
+            gc.get("acceptance_criteria")
+            or gc_art_data.get("acceptance_criteria")
+            or contract.get("acceptance_criteria")
+            or []
+        )
+        constraints = list(
+            gc.get("constraints")
+            or gc_art_data.get("constraints")
+            or contract.get("constraints")
+            or []
+        )
+        non_goals = list(
+            gc.get("non_goals")
+            or gc_art_data.get("non_goals")
+            or contract.get("non_goals")
+            or []
+        )
 
         execution_rounds = int(state.get("execution_rounds", 0))
         max_execution_rounds = int(self.ctl.config.get("planning.max_execution_rounds", 2))
@@ -229,6 +273,7 @@ class FinalReportGenerator:
                         "sha256": entry.get("sha256", "")[:12],
                         "updated_at": entry.get("updated_at", ""),
                         "not_applicable_reason": entry.get("not_applicable_reason"),
+                        "ref": entry.get("ref", ""),
                     }
                 )
 
@@ -246,6 +291,133 @@ class FinalReportGenerator:
             "acceptance_criteria": acceptance_criteria,
             "constraints": constraints,
             "non_goals": non_goals,
+        }
+
+        # 2. Extract Phase 5 Evidence
+        # Diagnosis / Root Cause
+        diag = _get_artifact_data("diagnosis")
+        if diag:
+            diagnosis_ev = {
+                "status": "Available",
+                "root_cause": str(diag.get("root_cause") or diag.get("diagnosis") or diag.get("cause") or "Root cause analyzed"),
+                "failure_symptoms": list(diag.get("failure_symptoms") or diag.get("symptoms") or []),
+                "causal_chain": list(diag.get("causal_chain") or []),
+            }
+        else:
+            diagnosis_ev = {"status": "Unavailable", "root_cause": "Unavailable", "reason": "No diagnosis artifact recorded"}
+
+        # Solution Candidates
+        sol = _get_artifact_data("solution_candidates")
+        if sol:
+            solutions_ev = {
+                "status": "Available",
+                "selected_approach": str(sol.get("selected_approach") or sol.get("approach") or sol.get("selected_candidate") or "Selected approach documented"),
+                "rejected_alternatives": list(sol.get("rejected_alternatives") or sol.get("alternatives") or sol.get("rejected_candidates") or []),
+                "trade_offs": str(sol.get("trade_offs") or ""),
+            }
+        else:
+            solutions_ev = {"status": "Unavailable", "selected_approach": "Unavailable", "reason": "No solution candidates artifact recorded"}
+
+        # Change Authority
+        ca = _get_artifact_data("change_authority")
+        if ca:
+            change_authority_ev = {
+                "status": "Available",
+                "classification": str(ca.get("classification") or ca.get("authority_level") or "LOCAL"),
+                "justification": str(ca.get("justification") or ca.get("reason") or ""),
+                "allowed_paths": list(ca.get("allowed_paths") or plan_summary["allowed_paths"]),
+            }
+        else:
+            change_authority_ev = {"status": "Unavailable", "classification": "LOCAL", "reason": "No change authority artifact recorded"}
+
+        # Goal Proof
+        gp = _get_artifact_data("goal_proof") or ev_dict.get("goal_proof") or {}
+        if gp:
+            goal_proof_ev = {
+                "status": "Available",
+                "entrypoint": gp.get("entrypoint") or (contract.get("proof_contract") or {}).get("entrypoint") or plan_summary["validation_commands"],
+                "completion_probe": gp.get("completion_probe") or (contract.get("proof_contract") or {}).get("completion_probe"),
+                "proof_passed": bool(gp.get("proof_passed", proof_passed)),
+                "exit_code": gp.get("entrypoint_exit_code", validation_summary["exit_code"]),
+                "path_integrity_status": str(gp.get("path_integrity_status") or path_integrity),
+                "reason": str(gp.get("reason") or ""),
+            }
+        else:
+            goal_proof_ev = {"status": "Unavailable", "proof_passed": proof_passed, "reason": "No goal proof artifact recorded"}
+
+        # Baseline vs Final Delta
+        base_res = _get_artifact_data("baseline_result")
+        if base_res:
+            base_st = base_res.get("status", "UNKNOWN")
+            base_rc = base_res.get("exit_code")
+            final_rc = goal_proof_ev.get("exit_code", validation_summary["exit_code"])
+            baseline_delta_ev = {
+                "status": "Available",
+                "baseline_status": base_st,
+                "baseline_exit_code": base_rc,
+                "final_status": terminal_status,
+                "final_exit_code": final_rc,
+                "summary": f"Baseline: {base_st} (exit code {base_rc}) -> Final: {terminal_status} (exit code {final_rc})",
+            }
+        else:
+            baseline_delta_ev = {
+                "status": "Unavailable",
+                "summary": f"Baseline not recorded -> Final: {terminal_status}",
+            }
+
+        # Critic Findings
+        crit = _get_artifact_data("critic_review") or ev_dict.get("critic") or review.get("critic")
+        if isinstance(crit, dict) and crit:
+            critic_findings_ev = {
+                "status": "Available",
+                "findings": list(crit.get("findings") or crit.get("objections") or []),
+                "verdict": str(crit.get("verdict") or crit.get("status") or "Completed"),
+                "resolutions": crit.get("resolutions") or crit.get("convergence") or "Adversarial review completed",
+            }
+        else:
+            critic_findings_ev = {"status": "Unavailable", "reason": "No critic review findings recorded"}
+
+        # Backtracking
+        backtrack_steps = []
+        for step in reasoning_trajectory:
+            action_name = str(step.get("action") or step.get("decision") or "")
+            if "RETURN" in action_name or "BACKTRACK" in action_name:
+                backtrack_steps.append({
+                    "activity": step.get("activity") or step.get("current_activity"),
+                    "action": action_name,
+                    "reason": step.get("reason", ""),
+                    "at": step.get("at", ""),
+                })
+        backtracking_ev = {
+            "occurred": len(backtrack_steps) > 0 or execution_rounds > 1,
+            "steps": backtrack_steps,
+            "summary": f"{len(backtrack_steps)} backtracking event(s) recorded" if backtrack_steps else "No backtracking occurred",
+        }
+
+        # Risks
+        preflight = _get_artifact_data("mutation_preflight") or {}
+        risks_ev = {
+            "risk_tags": list(plan_summary.get("risk_tags") or []),
+            "preflight_safe": bool(preflight.get("safe", True)),
+            "issues": list(preflight.get("issues") or []),
+        }
+
+        # Artifact References
+        art_refs = []
+        for art_type, entry in sorted((state.get("artifacts") or {}).items()):
+            if isinstance(entry, dict) and entry.get("ref"):
+                art_refs.append(f"{art_type}.v{entry.get('version', 1)}: {entry['ref']}")
+
+        phase5_evidence = {
+            "baseline_delta": baseline_delta_ev,
+            "diagnosis": diagnosis_ev,
+            "solution_candidates": solutions_ev,
+            "change_authority": change_authority_ev,
+            "goal_proof": goal_proof_ev,
+            "critic_findings": critic_findings_ev,
+            "backtracking": backtracking_ev,
+            "risks": risks_ev,
+            "artifact_references": art_refs,
         }
 
         # Compile markdown
@@ -269,6 +441,7 @@ class FinalReportGenerator:
             patch_summary=patch_summary,
             artifacts_provenance=artifacts_provenance,
             reasoning_trajectory=reasoning_trajectory,
+            phase5_evidence=phase5_evidence,
         )
 
         return FinalReport(
@@ -292,6 +465,7 @@ class FinalReportGenerator:
             patch_summary=patch_summary,
             artifacts_provenance=artifacts_provenance,
             reasoning_trajectory=reasoning_trajectory,
+            phase5_evidence=phase5_evidence,
             markdown_content=markdown_content,
         )
 
@@ -317,10 +491,12 @@ class FinalReportGenerator:
         patch_summary: dict[str, Any],
         artifacts_provenance: list[dict[str, Any]],
         reasoning_trajectory: list[dict[str, Any]],
+        phase5_evidence: dict[str, Any] | None = None,
     ) -> str:
         """Render rich, Obsidian-compatible markdown."""
         status_upper = status.upper()
         tag_status = status.lower()
+        ev = phase5_evidence or {}
 
         # Banner style
         if status_upper == "PASS":
@@ -400,6 +576,7 @@ class FinalReportGenerator:
         if not constraints and not non_goals:
             lines.append("- *(Standard repository bounds apply)*")
 
+        # Section 3: Deterministic Validation & Proof
         lines.extend([
             "",
             "## 3. Deterministic Validation & Proof",
@@ -407,10 +584,23 @@ class FinalReportGenerator:
             f"- **Validation Status**: `{validation_summary.get('status')}`",
             f"- **Subprocess Exit Code**: `{validation_summary.get('exit_code')}`",
             f"- **Execution Duration**: `{validation_summary.get('duration_seconds')}s`",
+        ])
+        gp_ev = ev.get("goal_proof") or {}
+        if gp_ev.get("status") == "Available":
+            lines.append(f"- **Goal Proof Passed**: `{gp_ev.get('proof_passed')}`")
+            lines.append(f"- **Proof Entrypoint**: `{gp_ev.get('entrypoint')}`")
+            if gp_ev.get("completion_probe"):
+                lines.append(f"- **Completion Probe**: `{gp_ev.get('completion_probe')}`")
+            lines.append(f"- **Path Integrity**: `{gp_ev.get('path_integrity_status')}`")
+            if gp_ev.get("reason"):
+                lines.append(f"- **Diagnostic Note**: {gp_ev['reason']}")
+        else:
+            lines.append(f"- **Goal Proof Passed**: `{proof_passed}` *(Legacy flow / {gp_ev.get('reason', 'Not recorded')})*")
+
+        lines.extend([
             "",
             "### Commands Executed",
         ])
-
         cmds = validation_summary.get("commands") or []
         if cmds:
             for cmd in cmds:
@@ -435,6 +625,7 @@ class FinalReportGenerator:
                 "```",
             ])
 
+        # Section 4: Implementation Telemetry
         lines.extend([
             "",
             "## 4. Implementation & Code Mutation Telemetry",
@@ -455,6 +646,7 @@ class FinalReportGenerator:
             else:
                 lines.append("*(No files modified)*")
 
+        # Section 5: Artifact Provenance Index
         lines.extend([
             "",
             "## 5. Artifact Provenance & Reasoning Graph",
@@ -470,6 +662,7 @@ class FinalReportGenerator:
         else:
             lines.append("| *(None)* | - | - | - | - | - |")
 
+        # Section 6: Reasoning Trajectory Timeline
         lines.extend([
             "",
             "## 6. Reasoning Trajectory Timeline",
@@ -486,6 +679,95 @@ class FinalReportGenerator:
                 lines.append(f"| {idx} | `{act}` | `{st}` | `{nxt}` | {at} |")
         else:
             lines.append("| 1 | *(Direct execution / legacy flow)* | - | - | - |")
+
+        # Section 7: Reality Audit & Diagnosis
+        lines.extend([
+            "",
+            "## 7. Reality Audit & Diagnosis",
+            "",
+        ])
+        diag_ev = ev.get("diagnosis") or {}
+        if diag_ev.get("status") == "Available":
+            lines.append(f"- **Root Cause**: {diag_ev.get('root_cause')}")
+            symptoms = diag_ev.get("failure_symptoms") or []
+            if symptoms:
+                lines.append(f"- **Observed Symptoms**: {', '.join(str(s) for s in symptoms)}")
+            chain = diag_ev.get("causal_chain") or []
+            if chain:
+                lines.append("- **Causal Chain**:")
+                for item in chain:
+                    lines.append(f"  - {item}")
+        else:
+            lines.append(f"- *(Diagnosis details unavailable: {diag_ev.get('reason', 'Not recorded')})*")
+
+        base_ev = ev.get("baseline_delta") or {}
+        lines.append(f"- **Baseline vs Final Delta**: {base_ev.get('summary', 'Unavailable')}")
+
+        # Section 8: Solution Exploration & Approach Selection
+        lines.extend([
+            "",
+            "## 8. Solution Exploration & Approach Selection",
+            "",
+        ])
+        sol_ev = ev.get("solution_candidates") or {}
+        if sol_ev.get("status") == "Available":
+            lines.append(f"- **Selected Approach**: {sol_ev.get('selected_approach')}")
+            alts = sol_ev.get("rejected_alternatives") or []
+            if alts:
+                lines.append("- **Evaluated & Rejected Alternatives**:")
+                for alt in alts:
+                    lines.append(f"  - {alt}")
+            if sol_ev.get("trade_offs"):
+                lines.append(f"- **Trade-Offs**: {sol_ev['trade_offs']}")
+        else:
+            lines.append(f"- *(Solution exploration unavailable: {sol_ev.get('reason', 'Not recorded')})*")
+
+        # Section 9: Change Authority & Scope Bounds
+        lines.extend([
+            "",
+            "## 9. Change Authority & Blast Radius",
+            "",
+        ])
+        ca_ev = ev.get("change_authority") or {}
+        if ca_ev.get("status") == "Available":
+            lines.append(f"- **Authority Classification**: `{ca_ev.get('classification')}`")
+            if ca_ev.get("justification"):
+                lines.append(f"- **Justification**: {ca_ev['justification']}")
+        else:
+            lines.append(f"- **Authority Classification**: `{ca_ev.get('classification', 'LOCAL')}` *(default / {ca_ev.get('reason', 'Not recorded')})*")
+        paths_bound = plan_summary.get("allowed_paths") or []
+        lines.append(f"- **Allowed Scope Bounds**: {', '.join(f'`{p}`' for p in paths_bound) if paths_bound else '*(No path restrictions)*'}")
+
+        # Section 10: Adversarial Critic Review
+        lines.extend([
+            "",
+            "## 10. Adversarial Critic Review",
+            "",
+        ])
+        crit_ev = ev.get("critic_findings") or {}
+        if crit_ev.get("status") == "Available":
+            lines.append(f"- **Review Verdict**: `{crit_ev.get('verdict')}`")
+            findings = crit_ev.get("findings") or []
+            if findings:
+                lines.append("- **Findings & Objections**:")
+                for fnd in findings:
+                    lines.append(f"  - {fnd}")
+            if crit_ev.get("resolutions"):
+                lines.append(f"- **Reconciliation / Resolution**: {crit_ev['resolutions']}")
+        else:
+            lines.append(f"- *(Adversarial review findings unavailable: {crit_ev.get('reason', 'Not recorded')})*")
+
+        # Section 11: Backtracking & Anti-Loop History
+        lines.extend([
+            "",
+            "## 11. Backtracking & Anti-Loop History",
+            "",
+        ])
+        bt_ev = ev.get("backtracking") or {}
+        lines.append(f"- **Backtracking Summary**: {bt_ev.get('summary', 'No backtracking occurred')}")
+        if bt_ev.get("steps"):
+            for s in bt_ev["steps"]:
+                lines.append(f"- Round {s.get('round', 1)}: `{s.get('action')}` ({s.get('reason')})")
 
         lines.append("")
         return "\n".join(lines)

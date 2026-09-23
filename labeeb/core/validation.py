@@ -8,7 +8,12 @@ from typing import Any
 
 from labeeb.config import Config
 from labeeb.errors import CommandError
-from labeeb.models import sha256_text, utc_now
+from labeeb.models import (
+    ArtifactValidity,
+    PathIntegrityStatus,
+    sha256_text,
+    utc_now,
+)
 from labeeb.providers.base import run_cmd
 from labeeb.providers.git import GitProvider
 from labeeb.providers.jules import (
@@ -83,18 +88,22 @@ def validate_evidence(
             "reason": "Patch contains paths outside allowed scope",
             "paths": evidence["out_of_scope_paths"],
         }
+        evidence["goal_proof"] = {"proof_passed": False, "reason": "Patch contains paths outside allowed scope"}
         return evidence
     if bool(config.get("safety.require_patch_for_implementation", True)) and not patch_ref:
         evidence["validation"] = {"status": "FAIL", "reason": "No git patch artifact found for implementation result"}
+        evidence["goal_proof"] = {"proof_passed": False, "reason": "No git patch artifact found for implementation result"}
         return evidence
     if not commands:
         if bool(config.get("safety.require_validation_for_pass", True)):
             evidence["validation"] = {"status": "BLOCKED", "reason": "No deterministic validation commands defined"}
         else:
             evidence["validation"] = {"status": "SKIPPED", "reason": "No validation commands defined"}
+        evidence["goal_proof"] = {"proof_passed": False, "reason": "No deterministic validation commands defined"}
         return evidence
     if not patch_ref or not base_commit:
         evidence["validation"] = {"status": "BLOCKED", "reason": "Patch or base commit missing; cannot build isolated validation worktree"}
+        evidence["goal_proof"] = {"proof_passed": False, "reason": "Patch or base commit missing; cannot build isolated validation worktree"}
         return evidence
 
     workspace = pathlib.Path(contract["workspace"])
@@ -125,8 +134,89 @@ def validate_evidence(
             )
             if result.rc != 0:
                 evidence["validation"] = {"status": "FAIL", "commands": results, "worktree": str(worktree)}
+                evidence["goal_proof"] = {"proof_passed": False, "reason": f"Validation command failed: {command}"}
                 return evidence
         evidence["validation"] = {"status": "PASS", "commands": results, "worktree": str(worktree)}
+
+        # Phase 4 Goal Proof: Execute the locked proof path in the isolated worktree
+        path_integrity = str(state.get("path_integrity_status") or PathIntegrityStatus.ORIGINAL)
+        proof_contract_data = None
+        proof_art = (state.get("artifacts") or {}).get("proof_contract")
+        proof_invalid_reason = None
+        if isinstance(proof_art, dict):
+            if proof_art.get("validity") == ArtifactValidity.VALID:
+                proof_contract_data = read_ref_json(proof_art["ref"]).get("data", {})
+            else:
+                proof_invalid_reason = "Proof contract artifact is STALE or invalid"
+        if proof_contract_data is None and not proof_invalid_reason:
+            proof_contract_data = contract.get("proof_contract")
+            if proof_contract_data is None and not (state.get("reasoning_graph_active") or state.get("proof_path_locked")):
+                val_cmds = contract.get("validation_commands") or []
+                if val_cmds:
+                    proof_contract_data = {"entrypoint": val_cmds[0]}
+
+        if proof_invalid_reason:
+            evidence["goal_proof"] = {
+                "proof_passed": False,
+                "reason": proof_invalid_reason,
+                "path_integrity_status": path_integrity,
+            }
+        elif not isinstance(proof_contract_data, dict):
+            evidence["goal_proof"] = {
+                "proof_passed": False,
+                "reason": "Missing locked proof contract",
+                "path_integrity_status": path_integrity,
+            }
+        elif path_integrity == PathIntegrityStatus.ALTERNATE_DIAGNOSTIC_ONLY:
+            evidence["goal_proof"] = {
+                "proof_passed": False,
+                "reason": "Alternate diagnostic proof path cannot produce terminal PASS",
+                "path_integrity_status": path_integrity,
+                "entrypoint": proof_contract_data.get("entrypoint"),
+            }
+        else:
+            entrypoint = str(proof_contract_data.get("entrypoint") or "").strip()
+            completion_probe = str(proof_contract_data.get("completion_probe") or "").strip()
+            if not entrypoint:
+                evidence["goal_proof"] = {
+                    "proof_passed": False,
+                    "reason": "Proof contract has no verifiable entrypoint defined",
+                    "path_integrity_status": path_integrity,
+                }
+            else:
+                p_started = time.monotonic()
+                res_entry = run_cmd([shell, "-lc", entrypoint], cwd=str(worktree), timeout=timeout, check=False)
+                entry_dur = round(time.monotonic() - p_started, 3)
+                entry_ok = (res_entry.rc == 0)
+
+                probe_ok = True
+                probe_res = None
+                if completion_probe:
+                    pb_started = time.monotonic()
+                    res_probe = run_cmd([shell, "-lc", completion_probe], cwd=str(worktree), timeout=timeout, check=False)
+                    pb_dur = round(time.monotonic() - pb_started, 3)
+                    probe_ok = (res_probe.rc == 0)
+                    probe_res = {
+                        "command": completion_probe,
+                        "exit_code": res_probe.rc,
+                        "duration_seconds": pb_dur,
+                        "stdout_tail": res_probe.stdout[-8000:],
+                        "stderr_tail": res_probe.stderr[-8000:],
+                    }
+
+                proof_passed = bool(entry_ok and probe_ok and evidence.get("validation", {}).get("status") == "PASS")
+                evidence["goal_proof"] = {
+                    "entrypoint": entrypoint,
+                    "completion_probe": completion_probe or None,
+                    "entrypoint_exit_code": res_entry.rc,
+                    "entrypoint_duration_seconds": entry_dur,
+                    "entrypoint_stdout": res_entry.stdout[-12000:],
+                    "entrypoint_stderr": res_entry.stderr[-12000:],
+                    "completion_probe_result": probe_res,
+                    "proof_passed": proof_passed,
+                    "path_integrity_status": path_integrity,
+                    "reason": "" if proof_passed else ("Entrypoint command failed" if not entry_ok else "Completion probe failed"),
+                }
         return evidence
     except CommandError as exc:
         evidence["validation"] = {
@@ -134,6 +224,10 @@ def validate_evidence(
             "reason": str(exc),
             "stdout_tail": exc.stdout[-8000:],
             "stderr_tail": exc.stderr[-8000:],
+        }
+        evidence["goal_proof"] = {
+            "proof_passed": False,
+            "reason": f"Command execution blocked: {exc}",
         }
         return evidence
     finally:

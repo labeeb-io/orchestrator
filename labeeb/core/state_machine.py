@@ -159,88 +159,163 @@ def critic_prompt(
 
 ALLOWED_ACTIVITY_TRANSITIONS: dict[str, set[str]] = {
     ReasoningActivity.AUTHORITY_CONTEXT: {
+        ReasoningActivity.AUTHORITY_CONTEXT,
         ReasoningActivity.GOAL_CONTRACT,
     },
     ReasoningActivity.GOAL_CONTRACT: {
+        ReasoningActivity.GOAL_CONTRACT,
         ReasoningActivity.PRODUCT_VALIDATION,
+        ReasoningActivity.PROOF_CONTRACT,
         ReasoningActivity.AUTHORITY_CONTEXT,
     },
     ReasoningActivity.PRODUCT_VALIDATION: {
+        ReasoningActivity.PRODUCT_VALIDATION,
         ReasoningActivity.PROOF_CONTRACT,
+        ReasoningActivity.REALITY_AUDIT,
         ReasoningActivity.GOAL_CONTRACT,
         ReasoningActivity.AUTHORITY_CONTEXT,
     },
     ReasoningActivity.PROOF_CONTRACT: {
+        ReasoningActivity.PROOF_CONTRACT,
         ReasoningActivity.REALITY_AUDIT,
-        ReasoningActivity.PRODUCT_VALIDATION,
-        ReasoningActivity.GOAL_CONTRACT,
-    },
-    ReasoningActivity.REALITY_AUDIT: {
         ReasoningActivity.MUTATION_PREFLIGHT,
         ReasoningActivity.BASELINE,
+        ReasoningActivity.PRODUCT_VALIDATION,
+        ReasoningActivity.GOAL_CONTRACT,
+        ReasoningActivity.AUTHORITY_CONTEXT,
+    },
+    ReasoningActivity.REALITY_AUDIT: {
+        ReasoningActivity.REALITY_AUDIT,
+        ReasoningActivity.MUTATION_PREFLIGHT,
+        ReasoningActivity.BASELINE,
+        ReasoningActivity.DIAGNOSIS,
+        ReasoningActivity.SOLUTION_EXPLORATION,
+        ReasoningActivity.PROOF_CONTRACT,
+        ReasoningActivity.PRODUCT_VALIDATION,
+        ReasoningActivity.GOAL_CONTRACT,
+        ReasoningActivity.AUTHORITY_CONTEXT,
+    },
+    ReasoningActivity.MUTATION_PREFLIGHT: {
+        ReasoningActivity.MUTATION_PREFLIGHT,
+        ReasoningActivity.BASELINE,
+        ReasoningActivity.DIAGNOSIS,
+        ReasoningActivity.SOLUTION_EXPLORATION,
+        ReasoningActivity.REALITY_AUDIT,
         ReasoningActivity.PROOF_CONTRACT,
         ReasoningActivity.GOAL_CONTRACT,
     },
-    ReasoningActivity.MUTATION_PREFLIGHT: {
-        ReasoningActivity.BASELINE,
-        ReasoningActivity.REALITY_AUDIT,
-        ReasoningActivity.PROOF_CONTRACT,
-    },
     ReasoningActivity.BASELINE: {
+        ReasoningActivity.BASELINE,
         ReasoningActivity.DIAGNOSIS,
         ReasoningActivity.SOLUTION_EXPLORATION,
+        ReasoningActivity.SECOND_REALITY_AUDIT,
         ReasoningActivity.MUTATION_PREFLIGHT,
         ReasoningActivity.REALITY_AUDIT,
         ReasoningActivity.PROOF_CONTRACT,
         ReasoningActivity.GOAL_CONTRACT,
     },
     ReasoningActivity.DIAGNOSIS: {
+        ReasoningActivity.DIAGNOSIS,
         ReasoningActivity.SOLUTION_EXPLORATION,
+        ReasoningActivity.SECOND_REALITY_AUDIT,
         ReasoningActivity.BASELINE,
+        ReasoningActivity.MUTATION_PREFLIGHT,
         ReasoningActivity.REALITY_AUDIT,
+        ReasoningActivity.PROOF_CONTRACT,
+        ReasoningActivity.GOAL_CONTRACT,
     },
     ReasoningActivity.SOLUTION_EXPLORATION: {
+        ReasoningActivity.SOLUTION_EXPLORATION,
         ReasoningActivity.SECOND_REALITY_AUDIT,
+        ReasoningActivity.DELIVERY_READINESS,
+        ReasoningActivity.INDEPENDENT_CRITIQUE,
+        ReasoningActivity.CONVERGENCE,
+        ReasoningActivity.CHANGE_AUTHORITY,
+        ReasoningActivity.IMPLEMENTATION_READINESS,
+        ReasoningActivity.DIAGNOSIS,
+        ReasoningActivity.BASELINE,
+        ReasoningActivity.MUTATION_PREFLIGHT,
+        ReasoningActivity.REALITY_AUDIT,
+        ReasoningActivity.PROOF_CONTRACT,
+        ReasoningActivity.GOAL_CONTRACT,
+    },
+    ReasoningActivity.SECOND_REALITY_AUDIT: {
+        ReasoningActivity.SECOND_REALITY_AUDIT,
+        ReasoningActivity.DELIVERY_READINESS,
+        ReasoningActivity.INDEPENDENT_CRITIQUE,
+        ReasoningActivity.CONVERGENCE,
+        ReasoningActivity.CHANGE_AUTHORITY,
+        ReasoningActivity.IMPLEMENTATION_READINESS,
+        ReasoningActivity.SOLUTION_EXPLORATION,
+        ReasoningActivity.DIAGNOSIS,
+        ReasoningActivity.BASELINE,
+        ReasoningActivity.MUTATION_PREFLIGHT,
+        ReasoningActivity.REALITY_AUDIT,
+        ReasoningActivity.PROOF_CONTRACT,
+        ReasoningActivity.GOAL_CONTRACT,
+    },
+    ReasoningActivity.DELIVERY_READINESS: {
+        ReasoningActivity.DELIVERY_READINESS,
+        ReasoningActivity.INDEPENDENT_CRITIQUE,
+        ReasoningActivity.CONVERGENCE,
+        ReasoningActivity.CHANGE_AUTHORITY,
+        ReasoningActivity.IMPLEMENTATION_READINESS,
+        ReasoningActivity.SECOND_REALITY_AUDIT,
+        ReasoningActivity.SOLUTION_EXPLORATION,
         ReasoningActivity.DIAGNOSIS,
         ReasoningActivity.BASELINE,
         ReasoningActivity.REALITY_AUDIT,
-    },
-    ReasoningActivity.SECOND_REALITY_AUDIT: {
-        ReasoningActivity.DELIVERY_READINESS,
-        ReasoningActivity.SOLUTION_EXPLORATION,
-        ReasoningActivity.DIAGNOSIS,
-        ReasoningActivity.REALITY_AUDIT,
-    },
-    ReasoningActivity.DELIVERY_READINESS: {
-        ReasoningActivity.INDEPENDENT_CRITIQUE,
-        ReasoningActivity.CONVERGENCE,
-        ReasoningActivity.SECOND_REALITY_AUDIT,
-        ReasoningActivity.SOLUTION_EXPLORATION,
+        ReasoningActivity.PROOF_CONTRACT,
         ReasoningActivity.PRODUCT_VALIDATION,
         ReasoningActivity.GOAL_CONTRACT,
     },
     ReasoningActivity.INDEPENDENT_CRITIQUE: {
+        ReasoningActivity.INDEPENDENT_CRITIQUE,
         ReasoningActivity.CONVERGENCE,
+        ReasoningActivity.CHANGE_AUTHORITY,
+        ReasoningActivity.IMPLEMENTATION_READINESS,
         ReasoningActivity.DELIVERY_READINESS,
         ReasoningActivity.SECOND_REALITY_AUDIT,
         ReasoningActivity.SOLUTION_EXPLORATION,
+        ReasoningActivity.DIAGNOSIS,
+        ReasoningActivity.REALITY_AUDIT,
+        ReasoningActivity.PROOF_CONTRACT,
+        ReasoningActivity.GOAL_CONTRACT,
     },
     ReasoningActivity.CONVERGENCE: {
+        ReasoningActivity.CONVERGENCE,
         ReasoningActivity.CHANGE_AUTHORITY,
+        ReasoningActivity.IMPLEMENTATION_READINESS,
+        ReasoningActivity.EXECUTION_CONTRACT,
         ReasoningActivity.INDEPENDENT_CRITIQUE,
+        ReasoningActivity.DELIVERY_READINESS,
         ReasoningActivity.SECOND_REALITY_AUDIT,
         ReasoningActivity.SOLUTION_EXPLORATION,
+        ReasoningActivity.DIAGNOSIS,
+        ReasoningActivity.REALITY_AUDIT,
+        ReasoningActivity.PROOF_CONTRACT,
+        ReasoningActivity.GOAL_CONTRACT,
     },
     ReasoningActivity.CHANGE_AUTHORITY: {
+        ReasoningActivity.CHANGE_AUTHORITY,
         ReasoningActivity.IMPLEMENTATION_READINESS,
+        ReasoningActivity.EXECUTION_CONTRACT,
         ReasoningActivity.CONVERGENCE,
-        ReasoningActivity.DIAGNOSIS,
+        ReasoningActivity.INDEPENDENT_CRITIQUE,
+        ReasoningActivity.DELIVERY_READINESS,
+        ReasoningActivity.SECOND_REALITY_AUDIT,
         ReasoningActivity.SOLUTION_EXPLORATION,
+        ReasoningActivity.DIAGNOSIS,
+        ReasoningActivity.REALITY_AUDIT,
+        ReasoningActivity.PROOF_CONTRACT,
+        ReasoningActivity.GOAL_CONTRACT,
     },
     ReasoningActivity.IMPLEMENTATION_READINESS: {
+        ReasoningActivity.IMPLEMENTATION_READINESS,
         ReasoningActivity.EXECUTION_CONTRACT,
         ReasoningActivity.CHANGE_AUTHORITY,
         ReasoningActivity.CONVERGENCE,
+        ReasoningActivity.INDEPENDENT_CRITIQUE,
         ReasoningActivity.DELIVERY_READINESS,
         ReasoningActivity.SECOND_REALITY_AUDIT,
         ReasoningActivity.SOLUTION_EXPLORATION,
@@ -253,16 +328,47 @@ ALLOWED_ACTIVITY_TRANSITIONS: dict[str, set[str]] = {
         ReasoningActivity.AUTHORITY_CONTEXT,
     },
     ReasoningActivity.EXECUTION_CONTRACT: {
+        ReasoningActivity.EXECUTION_CONTRACT,
         ReasoningActivity.IMPLEMENTATION_READINESS,
         ReasoningActivity.CHANGE_AUTHORITY,
         ReasoningActivity.CONVERGENCE,
+        ReasoningActivity.SECOND_REALITY_AUDIT,
+        ReasoningActivity.SOLUTION_EXPLORATION,
     },
 }
+
+
+# Brain may return AGENTS.md / artifact names instead of enum values.
+# Normalize before validating transitions.
+ACTIVITY_ALIASES: dict[str, str] = {
+    "baseline_result": ReasoningActivity.BASELINE,
+    "product_contract": ReasoningActivity.PRODUCT_VALIDATION,
+    "solution_candidates": ReasoningActivity.SOLUTION_EXPLORATION,
+    "second_audit": ReasoningActivity.SECOND_REALITY_AUDIT,
+    "delivery_review": ReasoningActivity.DELIVERY_READINESS,
+    "critic_review": ReasoningActivity.INDEPENDENT_CRITIQUE,
+    "critic": ReasoningActivity.INDEPENDENT_CRITIQUE,
+    "solution": ReasoningActivity.SOLUTION_EXPLORATION,
+    "readiness": ReasoningActivity.IMPLEMENTATION_READINESS,
+    "readiness_gate": ReasoningActivity.IMPLEMENTATION_READINESS,
+    "authority_classification": ReasoningActivity.CHANGE_AUTHORITY,
+}
+
+
+def normalize_activity_name(name: str | None) -> str | None:
+    """Resolve an artifact-style alias to the canonical ReasoningActivity value."""
+    if name is None:
+        return None
+    return ACTIVITY_ALIASES.get(name, name)
 
 
 def validate_activity_transition(current_activity: str, next_activity: str | None) -> bool:
     """Validate whether next_activity is an allowed forward transition or valid backtrack."""
     if next_activity is None:
+        return True
+    next_activity = normalize_activity_name(next_activity)
+    current_activity = normalize_activity_name(current_activity)
+    if next_activity == current_activity:
         return True
     allowed = ALLOWED_ACTIVITY_TRANSITIONS.get(current_activity)
     if allowed is None:
@@ -272,6 +378,7 @@ def validate_activity_transition(current_activity: str, next_activity: str | Non
             f"Invalid activity transition: from '{current_activity}' to '{next_activity}'. Allowed: {sorted(allowed)}"
         )
     return True
+
 
 
 def compile_authority_context(contract: dict[str, Any], config: Config) -> dict[str, Any]:
@@ -433,6 +540,15 @@ def activity_brain_prompt(
         ReasoningActivity.EXECUTION_CONTRACT: "Apply the semantics of /labeeb-orchestrator (bounded execution contract with strict remote-write boundary).",
     }.get(activity_name, "Apply Labeeb engineering principles.")
 
+    execution_field = ""
+    if activity_name == ReasoningActivity.EXECUTION_CONTRACT:
+        execution_field = """
+          "execution": {
+            "jules_prompt": "Explicit instructions for Jules implementer...",
+            "allowed_paths": ["allowed/file.py"],
+            "validation_commands": ["command to validate"]
+          },"""
+
     return textwrap.dedent(
         f"""
         You are the Labeeb engineering decision brain. Work READ-ONLY in the repository during this turn.
@@ -457,7 +573,7 @@ def activity_brain_prompt(
           "produced_artifact": {{
             "artifact_type": "{artifact_type}",
             "data": {{}}
-          }},
+          }},{execution_field}
           "invalidate_roots": ["artifact_type_to_invalidate_if_assumption_disproved"],
           "evidence_refs": ["file:path/to/code#L10-L20"],
           "human_checkpoint": {{

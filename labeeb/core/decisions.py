@@ -24,6 +24,7 @@ from labeeb.core.state_machine import (
     critic_prompt,
     event_brain_prompt,
     update_proof_path_lock,
+    normalize_activity_name,
     validate_activity_transition,
 )
 from labeeb.errors import ControllerError
@@ -72,13 +73,13 @@ def handle_reasoning_decision(ctl: LabeebController, state: dict[str, Any], deci
         ctl.fail(state, reason or "Reasoning failed", evidence=decision)
         return
 
-    current_activity = str(
+    current_activity = normalize_activity_name(str(
         decision.get("current_activity") or state.get("current_activity") or ReasoningActivity.GOAL_CONTRACT
-    )
+    ))
     state["reasoning_graph_active"] = True
     activity_status = str(decision.get("activity_status") or ArtifactStatus.SATISFIED)
     not_applicable_reason = decision.get("not_applicable_reason")
-    next_activity = decision.get("next_activity")
+    next_activity = normalize_activity_name(decision.get("next_activity"))
     invalidate_roots = list(decision.get("invalidate_roots") or [])
     evidence_refs = list(decision.get("evidence_refs") or [])
     produced = decision.get("produced_artifact")
@@ -171,13 +172,16 @@ def handle_reasoning_decision(ctl: LabeebController, state: dict[str, Any], deci
         ctl.complete_baseline_shortcut(state, decision)
         return
 
-    if action == ReasoningDecisionAction.IMPLEMENTATION_READY:
+    if action in {ReasoningDecisionAction.IMPLEMENTATION_READY, "PLAN_READY"}:
         handle_implementation_readiness_request(ctl, state, decision)
         return
 
-    if action == ReasoningDecisionAction.CONTINUE_REASONING:
+    if action in {ReasoningDecisionAction.CONTINUE_REASONING, ReasoningDecisionAction.RETURN_TO_THINKING}:
+        if not next_activity and action == ReasoningDecisionAction.RETURN_TO_THINKING and invalidate_roots:
+            raw_target = invalidate_roots[0]
+            next_activity = normalize_activity_name(ARTIFACT_TO_ACTIVITY.get(raw_target, raw_target))
         if not next_activity:
-            ctl.block(state, "CONTINUE_REASONING decision missing next_activity", evidence=decision)
+            ctl.block(state, f"{action} decision missing next_activity", evidence=decision)
             return
         state["current_activity"] = next_activity
         ctl.store.save(state)
@@ -220,20 +224,80 @@ def handle_reasoning_decision(ctl: LabeebController, state: dict[str, Any], deci
     ctl.block(state, f"Unhandled reasoning action: {action}", evidence=decision)
 
 
+def build_jules_prompt(
+    execution: dict[str, Any],
+    produced_data: dict[str, Any],
+    plan_summary: str = "",
+) -> str:
+    """Extract or synthesize a complete Jules prompt from execution or artifact data."""
+    direct = (
+        execution.get("jules_prompt")
+        or execution.get("prompt")
+        or produced_data.get("jules_prompt")
+        or produced_data.get("prompt")
+    )
+    if direct and str(direct).strip():
+        return str(direct).strip()
+
+    # Synthesize from structured execution_contract artifact fields
+    sections: list[str] = []
+    goal = (
+        produced_data.get("goal")
+        or produced_data.get("approved_direction")
+        or plan_summary
+    )
+    if goal:
+        sections.append(f"Goal:\n{goal}")
+
+    impl = produced_data.get("implementation") or produced_data.get("instructions")
+    if impl:
+        if isinstance(impl, list):
+            sections.append("Implementation Steps:\n" + "\n".join(f"- {s}" for s in impl))
+        elif isinstance(impl, str) and impl.strip():
+            sections.append(f"Implementation:\n{impl.strip()}")
+
+    expected = produced_data.get("expected_worker_output")
+    if expected:
+        sections.append(f"Expected Output:\n{expected}")
+
+    criteria = produced_data.get("acceptance_criteria")
+    if criteria and isinstance(criteria, list):
+        sections.append("Acceptance Criteria:\n" + "\n".join(f"- {c}" for c in criteria))
+
+    paths = execution.get("allowed_paths") or produced_data.get("allowed_paths")
+    if paths and isinstance(paths, list):
+        sections.append("Allowed Paths:\n" + "\n".join(f"- {p}" for p in paths))
+
+    cmds = execution.get("validation_commands") or produced_data.get("validation_commands")
+    if cmds and isinstance(cmds, list):
+        sections.append("Validation Commands:\n" + "\n".join(f"- {c}" for c in cmds))
+
+    stop_conds = produced_data.get("stop_conditions")
+    if stop_conds and isinstance(stop_conds, list):
+        sections.append("Stop Conditions:\n" + "\n".join(f"- {c}" for c in stop_conds))
+
+    return "\n\n".join(sections).strip()
+
+
 def handle_implementation_readiness_request(
     ctl: LabeebController, state: dict[str, Any], decision: dict[str, Any]
 ) -> None:
     """Handle IMPLEMENTATION_READY decision."""
     contract_seed = read_ref_json(state["contract_ref"])
     produced = decision.get("produced_artifact") or {}
-    execution = (
+    produced_data = produced.get("data", {}) if isinstance(produced, dict) else {}
+    execution = dict(
         decision.get("execution")
-        or (produced.get("data", {}) if isinstance(produced, dict) else {}).get("execution")
+        or produced_data.get("execution")
         or {}
     )
 
+    summary = str(decision.get("plan_summary") or decision.get("reason") or "").strip()
+    if not execution.get("jules_prompt"):
+        execution["jules_prompt"] = build_jules_prompt(execution, produced_data, plan_summary=summary)
+
     seed_allowed = list(contract_seed.get("allowed_paths") or [])
-    model_allowed = list(execution.get("allowed_paths") or [])
+    model_allowed = list(execution.get("allowed_paths") or produced_data.get("allowed_paths") or [])
     if seed_allowed:
         for path in model_allowed:
             if not path_allowed(path, seed_allowed):
@@ -244,7 +308,7 @@ def handle_implementation_readiness_request(
         allowed_paths = model_allowed
 
     seed_validation = list(contract_seed.get("validation_commands") or [])
-    validation = seed_validation or list(execution.get("validation_commands") or [])
+    validation = seed_validation or list(execution.get("validation_commands") or produced_data.get("validation_commands") or [])
     risk_tags = sorted(set(contract_seed.get("risk_tags") or []) | set(execution.get("risk_tags") or []))
 
     merged_contract = dict(contract_seed)
@@ -254,7 +318,7 @@ def handle_implementation_readiness_request(
     state["contract_ref"] = ctl.store.write_json(ctl.paths.contract, merged_contract)
 
     plan_payload = {
-        "plan_summary": decision.get("plan_summary") or decision.get("reason"),
+        "plan_summary": summary,
         "execution": {
             **execution,
             "allowed_paths": allowed_paths,
@@ -462,9 +526,20 @@ def handle_review_decision(ctl: LabeebController, state: dict[str, Any], decisio
     evidence = read_ref_json(state["review_ref"]) if state.get("review_ref") else {}
     if action == "PASS":
         validation = evidence.get("validation") or {}
-        if bool(ctl.config.get("safety.require_validation_for_pass", True)) and validation.get("status") != "PASS":
-            ctl.block(state, "Brain requested PASS without passing deterministic validation", evidence=decision)
-            return
+        goal_proof = evidence.get("goal_proof") or {}
+        if bool(ctl.config.get("safety.require_validation_for_pass", True)):
+            if validation.get("status") != "PASS":
+                ctl.block(state, "Brain requested PASS without passing deterministic validation", evidence=decision)
+                return
+            if state.get("reasoning_graph_active") or state.get("proof_path_locked") or evidence.get("goal_proof"):
+                if not goal_proof.get("proof_passed"):
+                    reason = str(goal_proof.get("reason") or "Goal proof entrypoint failed or was not satisfied")
+                    ctl.block(
+                        state,
+                        f"Brain requested PASS but goal proof failed: {reason}",
+                        evidence={"validation": validation, "goal_proof": goal_proof, "decision": decision},
+                    )
+                    return
         ctl.pass_goal(state, decision, evidence)
         return
     if action in {"RETURN_TO_THINKING", ReasoningDecisionAction.RETURN_TO_THINKING}:
@@ -534,6 +609,11 @@ def handle_review_decision(ctl: LabeebController, state: dict[str, Any], decisio
     if action in {"REPAIR", ReasoningDecisionAction.TARGETED_REPAIR}:
         if state.get("repair_reserved"):
             ctl.fail(state, "Result still requires repair after the single V1 repair budget was consumed", evidence=decision)
+            return
+        max_rounds = int(ctl.config.get("planning.max_execution_rounds", 2))
+        current_rounds = int(state.get("execution_rounds", 0))
+        if current_rounds >= max_rounds:
+            ctl.fail(state, f"Execution rounds exhausted: reached maximum of {max_rounds} rounds", evidence=decision)
             return
         message = str(decision.get("repair_message") or "").strip()
         if not message:
