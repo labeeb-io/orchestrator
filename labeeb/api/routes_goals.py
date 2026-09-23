@@ -256,8 +256,13 @@ async def get_artifact(goal_id: str, artifact_type: str, request: Request):
     status = ctl.status()
     art_meta = (status.get("artifacts") or {}).get(artifact_type)
     if isinstance(art_meta, dict) and art_meta.get("ref"):
-        with contextlib.suppress(Exception):
+        try:
             return read_ref_json(art_meta["ref"])
+        except Exception as exc:
+            raise HTTPException(
+                status_code=409,
+                detail=f"Artifact integrity verification failed: {exc}",
+            ) from exc
     if ctl.paths.artifacts.exists():
         for p in sorted(ctl.paths.artifacts.glob(f"{artifact_type}.v*.json"), reverse=True):
             import json

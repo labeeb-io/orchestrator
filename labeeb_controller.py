@@ -174,6 +174,6 @@ if __name__ == "__main__":
     import os
     import pathlib
     venv_python = pathlib.Path(__file__).resolve().parent / ".venv" / "bin" / "python3"
-    if venv_python.exists() and os.path.realpath(sys.executable) != os.path.realpath(str(venv_python)):
+    if venv_python.exists() and pathlib.Path(sys.prefix).resolve() != venv_python.parent.parent.resolve():
         os.execv(str(venv_python), [str(venv_python)] + sys.argv)
     raise SystemExit(main())

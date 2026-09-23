@@ -92,6 +92,9 @@ class FakeJulesProvider:
         self.messages: list[dict[str, Any]] = []
         self.initial_state = initial_state
 
+    def is_repo_available(self, repo: str) -> tuple[bool, list[str]]:
+        return True, [repo]
+
     def create_session(
         self,
         repo: str,
