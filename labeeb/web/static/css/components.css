@@ -1,0 +1,891 @@
+/* ==========================================================================
+   Buttons
+   DESIGN.md Rule: The primary action button (Acid Lime #e4f222) is the
+   ONLY chromatic element. All secondary buttons are neutral outline/ghost.
+   ========================================================================== */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: var(--radius-buttons);
+  font-size: 13px;
+  font-weight: 510;
+  cursor: pointer;
+  text-decoration: none;
+  border: 1px solid transparent;
+  transition: background-color 0.12s ease, border-color 0.12s ease, opacity 0.12s ease;
+  font-family: var(--font-sans);
+  letter-spacing: -0.01em;
+}
+
+/* The Solitary Chromatic CTA */
+.btn-primary {
+  background-color: var(--color-acid-lime);
+  color: var(--color-void);
+  font-weight: 510;
+  border-color: var(--color-acid-lime);
+}
+
+.btn-primary:hover {
+  background-color: #d6e31b;
+  border-color: #d6e31b;
+  color: var(--color-void);
+}
+
+.btn-primary:active {
+  transform: translateY(0.5px);
+}
+
+/* Ghost / Neutral Outline Button */
+.btn-secondary {
+  background-color: transparent;
+  color: var(--color-mist);
+  border: 1px solid var(--color-graphite);
+  font-weight: 400;
+}
+
+.btn-secondary:hover {
+  background-color: rgba(255, 255, 255, 0.04);
+  border-color: var(--color-smoke);
+  color: var(--color-paper);
+}
+
+/* Subtle Danger Button - Muted Coral Red */
+.btn-danger {
+  background-color: rgba(235, 87, 87, 0.06);
+  color: var(--color-coral-red);
+  border: 1px solid rgba(235, 87, 87, 0.24);
+  font-weight: 400;
+}
+
+.btn-danger:hover {
+  background-color: rgba(235, 87, 87, 0.14);
+  border-color: rgba(235, 87, 87, 0.4);
+}
+
+.btn-sm {
+  padding: 5px 11px;
+  font-size: 12px;
+  border-radius: var(--radius-buttons);
+}
+
+/* ==========================================================================
+   Badges & Pills
+   Matching DESIGN.md: subtle translucent backgrounds, 4px/9999px radius
+   ========================================================================== */
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 8px;
+  border-radius: var(--radius-badges);
+  font-size: 11px;
+  font-weight: 500;
+  font-family: var(--font-mono);
+  letter-spacing: 0.01em;
+  border: 1px solid transparent;
+  line-height: 1.4;
+}
+
+.badge-pass {
+  background-color: var(--color-pass-bg);
+  color: var(--color-pass-text);
+  border-color: var(--color-pass-border);
+}
+
+.badge-active {
+  background-color: var(--color-active-bg);
+  color: var(--color-active-text);
+  border-color: var(--color-active-border);
+}
+
+.badge-warn {
+  background-color: var(--color-warn-bg);
+  color: var(--color-warn-text);
+  border-color: var(--color-warn-border);
+}
+
+.badge-fail {
+  background-color: var(--color-fail-bg);
+  color: var(--color-fail-text);
+  border-color: var(--color-fail-border);
+}
+
+.badge-neutral {
+  background-color: rgba(255, 255, 255, 0.04);
+  color: var(--color-fog);
+  border-color: var(--color-graphite);
+}
+
+/* Status text utilities */
+.color-pass { color: var(--color-pulse-green) !important; }
+.color-fail { color: var(--color-coral-red) !important; }
+.color-warn { color: var(--color-iris-violet) !important; }
+
+/* ==========================================================================
+   Cards & Panels
+   Carbon #0f1011 substrate, 12px radius, hairline graphite border
+   ========================================================================== */
+
+.card {
+  background-color: var(--color-carbon);
+  border: 1px solid var(--color-graphite);
+  border-radius: var(--radius-cards);
+  padding: 20px;
+  margin-bottom: 20px;
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.card-title {
+  font-size: 14px;
+  font-weight: 510;
+  color: var(--color-paper);
+  letter-spacing: -0.01em;
+}
+
+/* Nested or elevated card panels */
+.card-subtle {
+  background-color: var(--color-obsidian);
+  border: 1px solid var(--color-graphite);
+  border-radius: var(--radius-buttons);
+  padding: 12px 16px;
+}
+
+/* ==========================================================================
+   Pipeline Progress Bar
+   ========================================================================== */
+
+.pipeline-track {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background-color: var(--color-carbon);
+  border: 1px solid var(--color-graphite);
+  border-radius: var(--radius-cards);
+  padding: 18px 24px;
+  margin-bottom: 24px;
+  overflow-x: auto;
+}
+
+.pipeline-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  position: relative;
+  flex: 1;
+}
+
+.pipeline-step::after {
+  content: "";
+  position: absolute;
+  top: 13px;
+  left: 50%;
+  width: 100%;
+  height: 1px;
+  background-color: var(--color-graphite);
+  z-index: 1;
+}
+
+.pipeline-step:last-child::after {
+  display: none;
+}
+
+.pipeline-step.completed::after {
+  background-color: var(--color-smoke);
+}
+
+.pipeline-step.active::after {
+  background-color: var(--color-smoke);
+}
+
+.step-node {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background-color: var(--color-obsidian);
+  border: 1px solid var(--color-smoke);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 500;
+  font-family: var(--font-mono);
+  z-index: 2;
+  color: var(--color-fog);
+  transition: all 0.15s ease;
+}
+
+.pipeline-step.completed .step-node {
+  background-color: var(--color-obsidian);
+  border-color: var(--color-pulse-green);
+  color: var(--color-pulse-green);
+}
+
+.pipeline-step.active .step-node {
+  background-color: var(--color-obsidian);
+  border-color: var(--color-paper);
+  color: var(--color-paper);
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.08);
+}
+
+.step-label {
+  font-size: 11.5px;
+  color: var(--color-fog);
+  font-weight: 400;
+}
+
+.pipeline-step.active .step-label {
+  color: var(--color-paper);
+  font-weight: 510;
+}
+
+/* ==========================================================================
+   Human Decision Banner
+   ========================================================================== */
+
+.decision-banner {
+  border: 1px solid var(--color-smoke);
+  background-color: var(--color-obsidian);
+  border-radius: var(--radius-cards);
+  padding: 18px 24px;
+  margin-bottom: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.decision-info h3 {
+  font-size: 14px;
+  font-weight: 510;
+  color: var(--color-paper);
+  margin-bottom: 4px;
+}
+
+.decision-info p {
+  font-size: 13px;
+  color: var(--color-mist);
+}
+
+/* ==========================================================================
+   Goal Detail Header Enhancements
+   ========================================================================== */
+
+.header-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background-color: var(--color-obsidian);
+  border: 1px solid var(--color-graphite);
+  border-radius: var(--radius-buttons);
+  padding: 3px 8px;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--color-mist);
+  line-height: 1.2;
+}
+
+.header-chip-id {
+  color: var(--color-bone);
+  border-color: rgba(56, 189, 248, 0.3);
+  background-color: rgba(56, 189, 248, 0.05);
+}
+
+.header-chip-repo {
+  border-color: rgba(251, 191, 36, 0.3);
+  background-color: rgba(251, 191, 36, 0.05);
+}
+
+.header-chip-branch {
+  border-color: rgba(192, 132, 252, 0.3);
+  background-color: rgba(192, 132, 252, 0.05);
+}
+
+.copy-icon-btn {
+  background: transparent;
+  border: none;
+  color: var(--color-fog);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px;
+  border-radius: 3px;
+  margin-left: 2px;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.copy-icon-btn:hover {
+  color: var(--color-paper);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.session-meta-bar {
+  display: flex;
+  gap: 10px;
+  border-top: 1px solid var(--color-graphite);
+  padding-top: 14px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.meta-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background-color: var(--color-obsidian);
+  border: 1px solid var(--color-graphite);
+  border-radius: var(--radius-buttons);
+  padding: 5px 12px;
+  font-size: 12px;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.meta-pill:hover {
+  border-color: var(--color-smoke);
+  background-color: rgba(255, 255, 255, 0.02);
+}
+
+.meta-icon {
+  font-size: 15px !important;
+  display: inline-flex;
+}
+
+.meta-icon-phase-pass { color: #27a644 !important; }
+.meta-icon-phase-fail { color: #eb5757 !important; }
+.meta-icon-phase-active { color: #e4f222 !important; }
+
+.meta-label {
+  color: var(--color-fog);
+  font-size: 11.5px;
+}
+
+.meta-val {
+  font-family: var(--font-mono);
+  color: var(--color-paper);
+  font-weight: 500;
+}
+
+.meta-val.phase-val {
+  color: #ffffff;
+  letter-spacing: 0.02em;
+}
+
+.meta-val.text-dim {
+  color: var(--color-ash);
+  font-weight: 400;
+}
+
+/* ==========================================================================
+   Tabs Navigation & Precision Color Accents
+   ========================================================================== */
+
+.tabs-nav {
+  display: flex;
+  border-bottom: 1px solid var(--color-graphite);
+  gap: 2px;
+  background-color: var(--color-carbon);
+  padding: 0 8px;
+  overflow-x: auto;
+  overflow-y: hidden !important;
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+  align-items: stretch;
+}
+
+.tabs-nav::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  background: transparent !important;
+}
+
+.tab-btn {
+  padding: 9px 12px;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--color-fog);
+  font-size: 12.5px;
+  font-weight: 480;
+  letter-spacing: -0.01em;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  font-family: var(--font-sans);
+  border-radius: 6px 6px 0 0;
+  position: relative;
+  flex-shrink: 0;
+}
+
+.tab-btn:hover:not(:disabled) {
+  color: var(--color-paper);
+  background-color: rgba(255, 255, 255, 0.035);
+}
+
+.tab-btn.active {
+  color: #ffffff;
+  border-bottom-color: var(--color-acid-lime);
+  font-weight: 550;
+  background: linear-gradient(180deg, rgba(228, 242, 34, 0.03) 0%, rgba(228, 242, 34, 0.08) 100%);
+}
+
+.tab-btn:disabled,
+.tab-btn[disabled] {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+/* Semantic Vibrant Tab Icon Accents */
+.tab-icon {
+  font-size: 17px !important;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.18s ease, filter 0.18s ease;
+}
+
+.tab-btn:hover:not(:disabled) .tab-icon {
+  transform: translateY(-1px);
+}
+
+/* Timeline & Events: Signal Teal / Cyan */
+.tab-icon-timeline {
+  color: #06b6d4 !important;
+  filter: drop-shadow(0 0 6px rgba(6, 182, 212, 0.35));
+}
+
+/* Contract & Plan: Acid Lime / Electric Yellow */
+.tab-icon-plan {
+  color: #e4f222 !important;
+  filter: drop-shadow(0 0 6px rgba(228, 242, 34, 0.4));
+}
+
+/* Evidence & Git Patch: Lavender / Biotech Violet */
+.tab-icon-evidence {
+  color: #a78bfa !important;
+  filter: drop-shadow(0 0 6px rgba(167, 139, 250, 0.35));
+}
+
+/* Claude Critic: Coral Red / Crimson */
+.tab-icon-critic {
+  color: #f87171 !important;
+  filter: drop-shadow(0 0 6px rgba(248, 113, 113, 0.35));
+}
+
+/* Visual Summary & Analytics: Electric Blue */
+.tab-icon-summary {
+  color: #60a5fa !important;
+  filter: drop-shadow(0 0 6px rgba(96, 165, 250, 0.35));
+}
+
+/* Terminal & Raw Logs: Mint Green / Emerald */
+.tab-icon-raw {
+  color: #34d399 !important;
+  filter: drop-shadow(0 0 6px rgba(52, 211, 153, 0.35));
+}
+
+/* Config Tab Icons */
+.tab-icon-config {
+  color: #fbbf24 !important;
+  filter: drop-shadow(0 0 6px rgba(251, 191, 36, 0.35));
+}
+
+.tab-icon-toml {
+  color: #38bdf8 !important;
+  filter: drop-shadow(0 0 6px rgba(56, 189, 248, 0.35));
+}
+
+.tab-pane {
+  display: none;
+}
+
+.tab-pane.active {
+  display: block;
+}
+
+/* ==========================================================================
+   Monospace & Code Views
+   Void substrate, hairline borders, Berkeley Mono
+   ========================================================================== */
+
+.code-block {
+  background-color: var(--color-void);
+  border: 1px solid var(--color-graphite);
+  border-radius: var(--radius-buttons);
+  padding: 14px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--color-mist);
+  line-height: 1.5;
+}
+
+.diff-view {
+  background-color: var(--color-void);
+  border: 1px solid var(--color-graphite);
+  border-radius: var(--radius-buttons);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  overflow-x: auto;
+  line-height: 1.5;
+}
+
+.diff-line {
+  padding: 2px 14px;
+  display: block;
+}
+
+.diff-add {
+  background-color: rgba(39, 166, 68, 0.09);
+  color: #38c158;
+}
+
+.diff-del {
+  background-color: rgba(235, 87, 87, 0.09);
+  color: #ff6b6b;
+}
+
+.diff-hdr {
+  color: var(--color-fog);
+  font-weight: 500;
+  background-color: rgba(255, 255, 255, 0.02);
+}
+
+/* ==========================================================================
+   Forms & Inputs
+   Strict 6px radius, subtle border, no glow
+   ========================================================================== */
+
+.form-group {
+  margin-bottom: 18px;
+}
+
+.form-label {
+  display: block;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--color-mist);
+  margin-bottom: 6px;
+  letter-spacing: -0.01em;
+}
+
+.form-input, .form-textarea, .form-select {
+  width: 100%;
+  background-color: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-inputs);
+  padding: 9px 12px;
+  color: var(--color-mist);
+  font-size: 13.5px;
+  font-family: var(--font-sans);
+  transition: border-color 0.15s ease;
+}
+
+.form-input:focus, .form-textarea:focus, .form-select:focus {
+  outline: none;
+  border-color: var(--color-mist);
+  background-color: rgba(255, 255, 255, 0.04);
+}
+
+.form-hint {
+  font-size: 11.5px;
+  color: var(--color-fog);
+  margin-top: 5px;
+  line-height: 1.4;
+}
+
+.tag-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.tag-checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  background-color: var(--color-obsidian);
+  border: 1px solid var(--color-graphite);
+  border-radius: var(--radius-buttons);
+  font-size: 12px;
+  cursor: pointer;
+  user-select: none;
+  color: var(--color-mist);
+}
+
+.tag-checkbox input {
+  cursor: pointer;
+  accent-color: var(--color-smoke);
+}
+
+/* ==========================================================================
+   Grid & Card Items
+   ========================================================================== */
+
+.goal-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 14px;
+}
+
+.goal-card-item {
+  background-color: var(--color-carbon);
+  border: 1px solid var(--color-graphite);
+  border-radius: var(--radius-cards);
+  padding: 16px 18px;
+  text-decoration: none;
+  color: inherit;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.goal-card-item:hover {
+  border-color: var(--color-smoke);
+  background-color: #121315;
+}
+
+.copy-btn {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--color-fog);
+  cursor: pointer;
+  padding: 2px 6px;
+  font-size: 11px;
+  font-family: var(--font-mono);
+  border-radius: var(--radius-sm);
+  transition: color 0.15s ease, background-color 0.15s ease;
+}
+
+.copy-btn:hover {
+  color: var(--color-paper);
+  background-color: rgba(255, 255, 255, 0.06);
+}
+
+/* Border status indicators */
+.border-l-pass { border-left: 3px solid var(--color-pulse-green) !important; }
+.border-l-fail { border-left: 3px solid var(--color-coral-red) !important; }
+.border-l-warn { border-left: 3px solid var(--color-smoke) !important; }
+.border-l-blue { border-left: 3px solid var(--color-smoke) !important; }
+.border-l-gray { border-left: 3px solid var(--color-graphite) !important; }
+
+/* Preset Picker Buttons */
+.preset-btn-group {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.preset-btn {
+  background-color: var(--color-obsidian);
+  border: 1px solid var(--color-graphite);
+  color: var(--color-fog);
+  font-size: 12px;
+  padding: 6px 12px;
+  border-radius: var(--radius-buttons);
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.preset-btn:hover {
+  border-color: var(--color-smoke);
+  color: var(--color-paper);
+}
+
+.preset-btn.active {
+  background-color: rgba(255, 255, 255, 0.05);
+  border-color: var(--color-mist);
+  color: var(--color-paper);
+  font-weight: 510;
+}
+
+/* Redesigned Risk Classification Grid */
+.risk-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.risk-card {
+  position: relative;
+  background-color: var(--color-obsidian);
+  border: 1px solid var(--color-graphite);
+  border-radius: var(--radius-buttons);
+  padding: 12px 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+  user-select: none;
+}
+
+.risk-card:hover {
+  border-color: var(--color-smoke);
+  background-color: #1a1c1e;
+}
+
+.risk-card.selected {
+  border-color: var(--color-smoke);
+  background-color: rgba(255, 255, 255, 0.04);
+}
+
+.risk-card input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  border: 1.5px solid var(--color-smoke);
+  border-radius: 4px;
+  background-color: transparent;
+  outline: none;
+  cursor: pointer;
+  margin-top: 2px;
+  display: inline-grid;
+  place-content: center;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.risk-card input[type="checkbox"]:hover {
+  border-color: var(--color-mist);
+}
+
+.risk-card input[type="checkbox"]:checked {
+  background-color: var(--color-acid-lime);
+  border-color: var(--color-acid-lime);
+}
+
+.risk-card input[type="checkbox"]::before {
+  content: "";
+  width: 9px;
+  height: 9px;
+  clip-path: polygon(14% 44%, 0 65%, 50% 100%, 100% 16%, 80% 0%, 43% 62%);
+  transform: scale(0);
+  transform-origin: bottom left;
+  transition: 120ms transform ease-in-out;
+  background-color: var(--color-void);
+}
+
+.risk-card input[type="checkbox"]:checked::before {
+  transform: scale(1);
+}
+
+.risk-card-content {
+  flex: 1;
+}
+
+.risk-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.risk-card-title {
+  font-size: 13px;
+  font-weight: 510;
+  color: var(--color-paper);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.risk-card-desc {
+  font-size: 11.5px;
+  color: var(--color-fog);
+  margin-top: 3px;
+  line-height: 1.35;
+}
+
+/* Tooltip on Info Icon */
+.risk-tooltip-icon {
+  color: var(--color-ash);
+  cursor: help;
+  font-size: 12px;
+  position: relative;
+  display: inline-flex;
+}
+
+.risk-tooltip-icon .tooltip-text {
+  visibility: hidden;
+  position: absolute;
+  bottom: 125%;
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: var(--color-obsidian);
+  color: var(--color-mist);
+  text-align: left;
+  padding: 8px 10px;
+  border-radius: var(--radius-buttons);
+  border: 1px solid var(--color-smoke);
+  font-size: 11.5px;
+  line-height: 1.35;
+  width: 220px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6);
+  z-index: 100;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  pointer-events: none;
+}
+
+.risk-tooltip-icon:hover .tooltip-text {
+  visibility: visible;
+  opacity: 1;
+}
+
+/* Reactive Impact Summary Box */
+.impact-panel {
+  margin-top: 12px;
+  padding: 12px 16px;
+  border-radius: var(--radius-buttons);
+  font-size: 12.5px;
+  line-height: 1.45;
+  transition: all 0.2s ease;
+}
+
+.impact-panel.high-risk {
+  background-color: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--color-smoke);
+  color: var(--color-mist);
+}
+
+.impact-panel.fast-path {
+  background-color: rgba(39, 166, 68, 0.05);
+  border: 1px solid rgba(39, 166, 68, 0.25);
+  color: var(--color-mist);
+}
+
+/* Log Rows */
+.log-row {
+  transition: background-color 0.1s ease;
+}
+
+.log-row:hover {
+  background-color: rgba(255, 255, 255, 0.02);
+}

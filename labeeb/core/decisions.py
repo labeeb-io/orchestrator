@@ -5,7 +5,6 @@ review decisions, critic reviews, and dispatching operations from LabeebControll
 """
 from __future__ import annotations
 
-import re
 from typing import TYPE_CHECKING, Any
 
 from labeeb.config import critic_needed
@@ -18,6 +17,7 @@ from labeeb.core.artifacts import (
     SOLUTION_CANDIDATES,
 )
 from labeeb.core.convergence import ReasoningProgressTracker
+from labeeb.core.prompts import _sanitize_direct_prompt, build_jules_prompt
 from labeeb.core.readiness import baseline_passed, evaluate_implementation_readiness
 from labeeb.core.state_machine import (
     activity_brain_prompt,
@@ -47,6 +47,19 @@ from labeeb.storage.goal_store import read_ref_json
 
 if TYPE_CHECKING:
     from labeeb.core.controller import LabeebController
+
+__all__ = [
+    "_sanitize_direct_prompt",
+    "build_jules_prompt",
+    "handle_reasoning_decision",
+    "handle_implementation_readiness_request",
+    "handle_plan_decision",
+    "perform_critic",
+    "approve_plan_if_authorized",
+    "dispatch_jules",
+    "handle_review_decision",
+    "wake_brain_for_event",
+]
 
 
 ACTIVITY_ARTIFACT_TYPES = {
@@ -230,85 +243,6 @@ def handle_reasoning_decision(ctl: LabeebController, state: dict[str, Any], deci
         return
 
     ctl.block(state, f"Unhandled reasoning action: {action}", evidence=decision)
-
-
-def _sanitize_direct_prompt(prompt_str: str) -> str:
-    """Sanitize phrases in Brain prompts that encourage textual/diff-only responses."""
-    text = prompt_str.strip()
-    replacements = [
-        (re.compile(r"Produce a unified patch containing only", re.IGNORECASE), "Create or modify the following file(s) in the repository working tree:"),
-        (re.compile(r"Produce a unified patch\b", re.IGNORECASE), "Create or modify the authorized file(s) in the repository working tree"),
-        (re.compile(r"Produce a patch\b", re.IGNORECASE), "Create or modify the authorized file(s) in the repository working tree"),
-        (re.compile(r"Return a patch\b", re.IGNORECASE), "Materialize the changes in the repository working tree"),
-        (re.compile(r"Output the following file\b", re.IGNORECASE), "Create or modify the following file in the repository working tree"),
-    ]
-    for pattern, repl in replacements:
-        text = pattern.sub(repl, text)
-    return text
-
-
-def build_jules_prompt(
-    execution: dict[str, Any],
-    produced_data: dict[str, Any],
-    plan_summary: str = "",
-) -> str:
-    """Extract or synthesize a complete Jules prompt from execution or artifact data, emphasizing working-tree mutation."""
-    direct = (
-        execution.get("jules_prompt")
-        or execution.get("prompt")
-        or produced_data.get("jules_prompt")
-        or produced_data.get("prompt")
-    )
-    if direct and str(direct).strip():
-        return _sanitize_direct_prompt(str(direct))
-
-    # Synthesize from structured execution_contract artifact fields
-    sections: list[str] = []
-    goal = (
-        produced_data.get("goal")
-        or produced_data.get("approved_direction")
-        or plan_summary
-    )
-    if goal:
-        sections.append(f"Goal:\n{goal}")
-
-    impl = produced_data.get("implementation") or produced_data.get("instructions")
-    if impl:
-        if isinstance(impl, list):
-            sections.append("Implementation Steps:\n" + "\n".join(f"- {s}" for s in impl))
-        elif isinstance(impl, str) and impl.strip():
-            sections.append(f"Implementation:\n{impl.strip()}")
-
-    new_files = produced_data.get("new_files") or []
-    modified_files = produced_data.get("modified_files") or []
-    expected = produced_data.get("expected_worker_output") or produced_data.get("expected_output")
-
-    if new_files and isinstance(new_files, list):
-        sections.append("Required Materialized File(s):\n" + "\n".join(f"- {f}" for f in new_files))
-    if modified_files and isinstance(modified_files, list):
-        sections.append("Required Working-Tree Modifications:\n" + "\n".join(f"- {f}" for f in modified_files))
-    if expected and not (new_files or modified_files):
-        sections.append(f"Required Working-Tree Changes:\n{expected}\nThe actual repository change is the required output.")
-    elif not (new_files or modified_files):
-        sections.append("Required Action:\nCreate or modify the authorized file(s) in the repository working tree.\nThe actual repository change is the required output.")
-
-    criteria = produced_data.get("acceptance_criteria")
-    if criteria and isinstance(criteria, list):
-        sections.append("Acceptance Criteria:\n" + "\n".join(f"- {c}" for c in criteria))
-
-    paths = execution.get("allowed_paths") or produced_data.get("allowed_paths")
-    if paths and isinstance(paths, list):
-        sections.append("Allowed Paths:\n" + "\n".join(f"- {p}" for p in paths))
-
-    cmds = execution.get("validation_commands") or produced_data.get("validation_commands")
-    if cmds and isinstance(cmds, list):
-        sections.append("Validation Commands:\n" + "\n".join(f"- {c}" for c in cmds))
-
-    stop_conds = produced_data.get("stop_conditions")
-    if stop_conds and isinstance(stop_conds, list):
-        sections.append("Stop Conditions:\n" + "\n".join(f"- {c}" for c in stop_conds))
-
-    return "\n\n".join(sections).strip()
 
 
 def handle_implementation_readiness_request(

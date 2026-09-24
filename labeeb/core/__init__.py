@@ -1,5 +1,6 @@
 """Core orchestration package exports."""
-from labeeb.core.controller import LabeebController, doctor
+from labeeb.core.controller import LabeebController
+from labeeb.core.diagnostics import doctor
 from labeeb.core.effects import EffectManager
 from labeeb.core.events import (
     EventBroadcaster,
